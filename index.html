@@ -49,7 +49,7 @@
 <!-- LOGIN -->
 <div id="login">
   <form class="lcard" id="loginForm">
-    <h1>📊 Painel de Gestão</h1>
+    <h1>📊 Painel de Gestão Comercial</h1>
     <p>Acesse com seu login e senha.</p>
     <label>E-mail</label>
     <input type="email" id="email" autocomplete="username" required>
@@ -62,11 +62,14 @@
 
 <!-- APP -->
 <header id="appHeader" style="display:none">
-  <h1>📊 Painel de Gestão</h1>
+  <div>
+    <h1>📊 Painel de Gestão Comercial</h1>
+    <div class="who" id="lastUpd"></div>
+  </div>
   <div class="tabs" id="tabs">
     <button class="tab" id="tabLig" data-t="lig">📞 Ligações</button>
-    <button class="tab" id="tabMat" data-t="mat">🎓 Matrículas</button>
     <button class="tab" id="tabAt" data-t="at">💬 Atendimentos</button>
+    <button class="tab" id="tabMat" data-t="mat">🎓 Matrículas</button>
     <button class="tab" id="tabCross" data-t="cross">🔗 Cruzamento</button>
     <button class="btn ghost" id="reloadBtn" title="Recarregar relatórios do servidor">↻</button>
     <button class="btn" id="uploadBtn" style="display:none">⬆ Atualizar relatórios</button>
@@ -141,6 +144,19 @@ async function loadReports(){
   const first = lig?'lig':mat?'mat':at?'at':null;
   if(first){ $('#status').style.display='none'; show(first); }
   else $('#status').textContent='Nenhum relatório no servidor ainda.'+(isAdmin?' Clique em "Atualizar relatórios" para enviar.':' Peça ao admin para enviar.');
+  renderLastUpdated();
+}
+
+// "Atualizado em": última modificação entre os arquivos do bucket
+async function renderLastUpdated(){
+  const el=$('#lastUpd'); if(!el) return;
+  try{
+    const {data}=await sb.storage.from(C.BUCKET).list('',{limit:200});
+    const times=(data||[]).map(o=>o.updated_at||o.created_at||(o.metadata&&o.metadata.lastModified)).filter(Boolean).map(t=>new Date(t).getTime()).filter(n=>!isNaN(n));
+    if(!times.length){ el.textContent=''; return; }
+    const d=new Date(Math.max(...times)), p=n=>String(n).padStart(2,'0');
+    el.textContent=`Atualizado em: ${p(d.getDate())}/${p(d.getMonth()+1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  }catch(e){ el.textContent=''; }
 }
 
 // envia os buffers já baixados para os iframes que já carregaram

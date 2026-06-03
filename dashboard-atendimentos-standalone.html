@@ -414,8 +414,10 @@ function renderEval(){
   const avg=evalGeral.sum/evalGeral.n, max=Math.max(...[1,2,3,4,5].map(s=>evalDist[s]),1);
   let bars=''; for(let s=5;s>=1;s--){ const v=evalDist[s],p=v/evalGeral.n*100,col=s>=4?'var(--good)':s===3?'var(--warn)':'var(--bad)';
     bars+=`<div class="statline"><div class="top"><span>${s} ★</span><span style="color:var(--muted)">${int(v)} · ${p.toFixed(1)}%</span></div><div class="bar-wrap" style="height:10px"><div class="bar" style="width:${v/max*100}%;background:${col}"></div></div></div>`; }
-  box.innerHTML=`<div style="display:flex;gap:28px;flex-wrap:wrap;align-items:center">
-    <div><div style="font-size:42px;font-weight:800;color:var(--good);line-height:1">${avg.toFixed(2)}</div><div class="sub">nota média geral · ${int(evalGeral.n)} avaliações</div></div>
+  const totalAt=ALL.length||0, pctAval=totalAt? evalGeral.n/totalAt*100 : 0;
+  box.innerHTML=`<div style="display:flex;gap:32px;flex-wrap:wrap;align-items:center">
+    <div><div style="font-size:42px;font-weight:800;color:var(--accent);line-height:1">${int(evalGeral.n)}</div><div class="sub">atendimentos avaliados · ${pctAval.toFixed(1)}% do total (${int(totalAt)})</div></div>
+    <div><div style="font-size:42px;font-weight:800;color:var(--good);line-height:1">${avg.toFixed(2)}</div><div class="sub">nota média geral</div></div>
     <div style="flex:1;min-width:240px">${bars}</div></div>`;
 }
 function aggBy(data,keyFn){
