@@ -147,8 +147,8 @@ function pushTo(tab){
   const f=frame(tab), b=buffers;
   if(!f||!loaded[tab]) return;
   try{
-    if(tab==='cross') f.contentWindow.postMessage({kind:'loadCross',mat:b.mat,lig:b.lig,at:b.at},'*');
-    else { const buf = tab==='lig'?b.lig:tab==='mat'?b.mat:b.at; if(buf) f.contentWindow.postMessage({kind:'loadWorkbook',buffer:buf},'*'); }
+    if(tab==='cross') f.contentWindow.postMessage({kind:'loadCross',mat:b.mat,lig:b.lig,at:b.at,canChange:isAdmin},'*');
+    else { const buf = tab==='lig'?b.lig:tab==='mat'?b.mat:b.at; if(buf) f.contentWindow.postMessage({kind:'loadWorkbook',buffer:buf,canChange:isAdmin},'*'); }
   }catch(e){}
 }
 function pushAll(){ ['lig','mat','at','cross'].forEach(pushTo); }

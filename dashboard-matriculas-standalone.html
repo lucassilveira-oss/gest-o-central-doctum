@@ -633,7 +633,8 @@ function handleFile(file){
 }
 // permite que o painel de gestão envie a planilha por mensagem (uso embutido em iframe)
 window.addEventListener('message',function(ev){ var d=ev.data||{}; if(d&&d.kind==='loadWorkbook'&&d.buffer){
-  try{ processWorkbook(XLSX.read(d.buffer,{type:'array'})); }catch(err){ alert('Erro ao processar a planilha de matrículas: '+err.message); } } });
+  try{ processWorkbook(XLSX.read(d.buffer,{type:'array'})); }catch(err){ alert('Erro ao processar a planilha de matrículas: '+err.message); }
+  if(d.canChange===false){ var rb=document.getElementById('reloadBtn'); if(rb)rb.style.display='none'; } } });
 const drop=$('#drop');
 drop.onclick=()=>$('#file').click();
 $('#file').onchange=e=>{ if(e.target.files[0]) handleFile(e.target.files[0]); };

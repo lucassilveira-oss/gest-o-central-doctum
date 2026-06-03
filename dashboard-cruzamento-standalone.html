@@ -538,7 +538,8 @@ zone('#uzAt','#inpAt','#fAtName',b=>bAt=b);
 $('#crossBtn').onclick=()=>runCross(bMat,bLig,bAt);
 
 // ===== Integração com o Painel de Gestão =====
-window.addEventListener('message',function(ev){ var d=ev.data||{}; if(d&&d.kind==='loadCross'){ try{ runCross(d.mat,d.lig,d.at); }catch(err){ alert('Erro no cruzamento: '+err.message); } } });
+window.addEventListener('message',function(ev){ var d=ev.data||{}; if(d&&d.kind==='loadCross'){ try{ runCross(d.mat,d.lig,d.at); }catch(err){ alert('Erro no cruzamento: '+err.message); }
+  if(d.canChange===false){ var rb=document.getElementById('reloadBtn'); if(rb)rb.style.display='none'; } } });
 </script>
 </body>
 </html>
