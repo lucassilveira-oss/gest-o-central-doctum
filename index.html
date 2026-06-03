@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Painel de Gestão — Online</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<style>
+  :root{--bg:#0f172a;--panel:#1e293b;--panel2:#273549;--line:#334155;--txt:#e2e8f0;--muted:#94a3b8;--accent:#38bdf8;--good:#34d399;--bad:#f87171;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--txt);height:100vh;display:flex;flex-direction:column;overflow:hidden}
+  /* login */
+  #login{flex:1;display:flex;align-items:center;justify-content:center;padding:24px}
+  .lcard{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:32px;width:100%;max-width:380px}
+  .lcard h1{font-size:20px;margin-bottom:4px} .lcard p{color:var(--muted);font-size:13px;margin-bottom:20px}
+  .lcard label{display:block;font-size:12px;color:var(--muted);margin:12px 0 4px}
+  .lcard input{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:8px;background:var(--panel2);color:var(--txt);font-size:14px}
+  .lcard button{width:100%;margin-top:18px;background:var(--accent);color:#062130;border:none;padding:12px;border-radius:9px;font-weight:700;font-size:15px;cursor:pointer}
+  .lcard button:disabled{opacity:.5;cursor:not-allowed}
+  .lerr{color:var(--bad);font-size:13px;margin-top:12px;min-height:18px;text-align:center}
+  /* app */
+  header{display:flex;align-items:center;gap:12px;padding:10px 18px;border-bottom:1px solid var(--line);background:var(--panel);flex-wrap:wrap}
+  header h1{font-size:17px;font-weight:700}
+  .tabs{display:flex;gap:7px;margin-left:auto;align-items:center;flex-wrap:wrap}
+  .tab{background:transparent;color:var(--muted);border:1px solid var(--line);padding:7px 13px;border-radius:8px;font-size:13px;cursor:pointer;font-weight:600}
+  .tab.on{background:var(--accent);color:#062130;border-color:var(--accent)}
+  .tab:disabled{opacity:.35;cursor:not-allowed}
+  .btn{background:var(--accent);color:#062130;border:none;padding:8px 14px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer}
+  .btn.ghost{background:transparent;color:var(--accent);border:1px solid var(--line);font-weight:600}
+  .who{font-size:12px;color:var(--muted)}
+  #wrap{flex:1;position:relative}
+  iframe{position:absolute;inset:0;width:100%;height:100%;border:none;display:none;background:var(--bg)}
+  iframe.on{display:block}
+  #status{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:15px}
+  /* modal upload */
+  #modal{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:100}
+  #modal.on{display:flex}
+  .mcard{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:26px;width:100%;max-width:520px}
+  .mcard h2{font-size:18px;margin-bottom:14px}
+  .uprow{display:flex;align-items:center;gap:10px;margin-bottom:10px;font-size:13px}
+  .uprow .lbl{width:130px;color:var(--muted)} .uprow input{flex:1;font-size:12px;color:var(--txt)}
+  .mfoot{display:flex;gap:10px;justify-content:flex-end;margin-top:18px}
+  .hint{color:var(--muted);font-size:12px}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login">
+  <form class="lcard" id="loginForm">
+    <h1>📊 Painel de Gestão</h1>
+    <p>Acesse com seu login e senha.</p>
+    <label>E-mail</label>
+    <input type="email" id="email" autocomplete="username" required>
+    <label>Senha</label>
+    <input type="password" id="password" autocomplete="current-password" required>
+    <button type="submit" id="loginBtn">Entrar</button>
+    <div class="lerr" id="loginErr"></div>
+  </form>
+</div>
+
+<!-- APP -->
+<header id="appHeader" style="display:none">
+  <h1>📊 Painel de Gestão</h1>
+  <div class="tabs" id="tabs">
+    <button class="tab" id="tabLig" data-t="lig">📞 Ligações</button>
+    <button class="tab" id="tabMat" data-t="mat">🎓 Matrículas</button>
+    <button class="tab" id="tabAt" data-t="at">💬 Atendimentos</button>
+    <button class="tab" id="tabCross" data-t="cross">🔗 Cruzamento</button>
+    <button class="btn ghost" id="reloadBtn" title="Recarregar relatórios do servidor">↻</button>
+    <button class="btn" id="uploadBtn" style="display:none">⬆ Atualizar relatórios</button>
+    <span class="who" id="who"></span>
+    <button class="btn ghost" id="logoutBtn">Sair</button>
+  </div>
+</header>
+
+<div id="wrap" style="display:none">
+  <div id="status">Faça login para começar.</div>
+  <iframe id="frameLig" src="dashboard-standalone.html"></iframe>
+  <iframe id="frameMat" src="dashboard-matriculas-standalone.html"></iframe>
+  <iframe id="frameAt" src="dashboard-atendimentos-standalone.html"></iframe>
+  <iframe id="frameCross" src="dashboard-cruzamento-standalone.html"></iframe>
+</div>
+
+<!-- MODAL UPLOAD (admin) -->
+<div id="modal">
+  <div class="mcard">
+    <h2>⬆ Atualizar relatórios</h2>
+    <p class="hint" style="margin-bottom:14px">Escolha os arquivos que quer atualizar. Os que ficarem em branco continuam como estão.</p>
+    <div class="uprow"><span class="lbl">📞 Ligações</span><input type="file" id="upLig" accept=".xls,.xlsx"></div>
+    <div class="uprow"><span class="lbl">🎓 Matrículas</span><input type="file" id="upMat" accept=".xls,.xlsx"></div>
+    <div class="uprow"><span class="lbl">💬 Atendimentos</span><input type="file" id="upAt" accept=".xls,.xlsx"></div>
+    <div class="lerr" id="upErr" style="text-align:left"></div>
+    <div class="mfoot">
+      <button class="btn ghost" id="upCancel">Cancelar</button>
+      <button class="btn" id="upSend">Enviar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const C = window.APP_CONFIG;
+const sb = supabase.createClient(C.SUPABASE_URL, C.SUPABASE_ANON_KEY);
+const $ = s => document.querySelector(s);
+let isAdmin=false, buffers={lig:null,mat:null,at:null}, loaded={lig:false,mat:false,at:false,cross:false};
+
+// ---- AUTH ----
+$('#loginForm').addEventListener('submit', async e=>{
+  e.preventDefault(); $('#loginErr').textContent=''; $('#loginBtn').disabled=true; $('#loginBtn').textContent='Entrando...';
+  const {error}=await sb.auth.signInWithPassword({email:$('#email').value.trim(),password:$('#password').value});
+  $('#loginBtn').disabled=false; $('#loginBtn').textContent='Entrar';
+  if(error){ $('#loginErr').textContent='E-mail ou senha inválidos.'; }
+});
+$('#logoutBtn').onclick=async ()=>{ await sb.auth.signOut(); location.reload(); };
+
+sb.auth.onAuthStateChange((_e,session)=>{ if(session) enterApp(session.user); });
+sb.auth.getSession().then(({data})=>{ if(data.session) enterApp(data.session.user); });
+
+function enterApp(user){
+  isAdmin = (C.ADMIN_EMAILS||[]).map(x=>x.toLowerCase()).includes((user.email||'').toLowerCase());
+  $('#login').style.display='none';
+  $('#appHeader').style.display='flex';
+  $('#wrap').style.display='block';
+  $('#who').textContent = user.email + (isAdmin?' (admin)':' (líder)');
+  $('#uploadBtn').style.display = isAdmin ? 'inline-block' : 'none';
+  loadReports();
+}
+
+// ---- STORAGE ----
+async function dl(name){ try{ const {data,error}=await sb.storage.from(C.BUCKET).download(name); if(error||!data)return null; return await data.arrayBuffer(); }catch(e){ return null; } }
+
+async function loadReports(){
+  $('#status').style.display='flex'; $('#status').textContent='Carregando relatórios do servidor...';
+  const [lig,mat,at]=await Promise.all([dl(C.FILES.lig),dl(C.FILES.mat),dl(C.FILES.at)]);
+  buffers={lig,mat,at};
+  $('#tabLig').disabled=!lig; $('#tabMat').disabled=!mat; $('#tabAt').disabled=!at;
+  $('#tabCross').disabled=!(mat&&(lig||at));
+  pushAll();
+  const first = lig?'lig':mat?'mat':at?'at':null;
+  if(first){ $('#status').style.display='none'; show(first); }
+  else $('#status').textContent='Nenhum relatório no servidor ainda.'+(isAdmin?' Clique em "Atualizar relatórios" para enviar.':' Peça ao admin para enviar.');
+}
+
+// envia os buffers já baixados para os iframes que já carregaram
+function pushTo(tab){
+  const f=frame(tab), b=buffers;
+  if(!f||!loaded[tab]) return;
+  try{
+    if(tab==='cross') f.contentWindow.postMessage({kind:'loadCross',mat:b.mat,lig:b.lig,at:b.at},'*');
+    else { const buf = tab==='lig'?b.lig:tab==='mat'?b.mat:b.at; if(buf) f.contentWindow.postMessage({kind:'loadWorkbook',buffer:buf},'*'); }
+  }catch(e){}
+}
+function pushAll(){ ['lig','mat','at','cross'].forEach(pushTo); }
+function frame(t){ return $('#frame'+(t==='lig'?'Lig':t==='mat'?'Mat':t==='at'?'At':'Cross')); }
+
+['lig','mat','at','cross'].forEach(t=>{ frame(t).addEventListener('load',()=>{ loaded[t]=true; pushTo(t); }); });
+
+// ---- TABS ----
+function show(t){
+  ['lig','mat','at','cross'].forEach(x=>{ frame(x).classList.toggle('on',x===t); $('#tab'+(x==='lig'?'Lig':x==='mat'?'Mat':x==='at'?'At':'Cross')).classList.toggle('on',x===t); });
+}
+$('#tabLig').onclick=()=>{ if(!$('#tabLig').disabled) show('lig'); };
+$('#tabMat').onclick=()=>{ if(!$('#tabMat').disabled) show('mat'); };
+$('#tabAt').onclick=()=>{ if(!$('#tabAt').disabled) show('at'); };
+$('#tabCross').onclick=()=>{ if(!$('#tabCross').disabled) show('cross'); };
+$('#reloadBtn').onclick=loadReports;
+
+// ---- UPLOAD (admin) ----
+$('#uploadBtn').onclick=()=>{ $('#upErr').textContent=''; $('#modal').classList.add('on'); };
+$('#upCancel').onclick=()=>$('#modal').classList.remove('on');
+$('#upSend').onclick=async ()=>{
+  $('#upErr').textContent=''; $('#upSend').disabled=true; $('#upSend').textContent='Enviando...';
+  const jobs=[['#upLig',C.FILES.lig],['#upMat',C.FILES.mat],['#upAt',C.FILES.at]];
+  try{
+    let any=false;
+    for(const [sel,name] of jobs){ const f=$(sel).files[0]; if(!f)continue; any=true;
+      const {error}=await sb.storage.from(C.BUCKET).upload(name,f,{upsert:true,contentType:'application/octet-stream'});
+      if(error) throw new Error(name+': '+error.message);
+    }
+    if(!any){ $('#upErr').textContent='Selecione ao menos um arquivo.'; }
+    else { $('#modal').classList.remove('on'); ['#upLig','#upMat','#upAt'].forEach(s=>$(s).value=''); await loadReports(); }
+  }catch(err){ $('#upErr').textContent='Erro ao enviar: '+err.message; }
+  $('#upSend').disabled=false; $('#upSend').textContent='Enviar';
+};
+</script>
+</body>
+</html>
