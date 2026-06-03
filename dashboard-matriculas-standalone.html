@@ -448,11 +448,11 @@ function renderKPIs(){
   const pend=d.filter(x=>x.nsBol.includes('venc')||x.nsBol.includes('aberto')).length;
   const valor=d.reduce((s,x)=>s+x.valor,0);
   const pagantes=d.filter(x=>x.valor>0).length;
-  // "Matrículas geradas" SEMPRE pela Data da Matrícula (independe da base de data e do pagamento)
-  const geradas=fDataNoDate().filter(x=>inDate(x.dMat)).length;
+  // "Matrículas geradas" SEMPRE pela Data da Pré-matrícula (independe da base de data escolhida)
+  const geradas=fDataNoDate().filter(x=>inDate(x.dPre)).length;
   const pct=v=>n?(v/n*100).toFixed(1):0;
   const cards=[
-    {label:'Matrículas geradas',val:int(geradas),foot:'sempre por Data da Matrícula',cls:'accent'},
+    {label:'Matrículas geradas',val:int(geradas),foot:'sempre por Data da Pré-matrícula',cls:'accent'},
     {label:'Matriculados',val:int(mat),foot:pct(mat)+'%',cls:'good'},
     {label:'Pré-matriculados',val:int(pre),foot:pct(pre)+'% · a converter',cls:'warn'},
     {label:'Trancados',val:int(tra),foot:pct(tra)+'%',cls:'bad'},
