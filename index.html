@@ -91,6 +91,7 @@
     <div class="uprow"><span class="lbl">📞 Ligações</span><input type="file" id="upLig" accept=".xls,.xlsx"></div>
     <div class="uprow"><span class="lbl">🎓 Matrículas</span><input type="file" id="upMat" accept=".xls,.xlsx"></div>
     <div class="uprow"><span class="lbl">💬 Atendimentos</span><input type="file" id="upAt" accept=".xls,.xlsx"></div>
+    <div class="uprow"><span class="lbl">⭐ Avaliações</span><input type="file" id="upAval" accept=".xls,.xlsx"></div>
     <div class="lerr" id="upErr" style="text-align:left"></div>
     <div class="mfoot">
       <button class="btn ghost" id="upCancel">Cancelar</button>
@@ -103,7 +104,7 @@
 const C = window.APP_CONFIG;
 const sb = supabase.createClient(C.SUPABASE_URL, C.SUPABASE_ANON_KEY);
 const $ = s => document.querySelector(s);
-let isAdmin=false, buffers={lig:null,mat:null,at:null}, loaded={lig:false,mat:false,at:false,cross:false};
+let isAdmin=false, buffers={lig:null,mat:null,at:null,aval:null}, loaded={lig:false,mat:false,at:false,cross:false};
 
 // ---- AUTH ----
 $('#loginForm').addEventListener('submit', async e=>{
@@ -132,8 +133,8 @@ async function dl(name){ try{ const {data,error}=await sb.storage.from(C.BUCKET)
 
 async function loadReports(){
   $('#status').style.display='flex'; $('#status').textContent='Carregando relatórios do servidor...';
-  const [lig,mat,at]=await Promise.all([dl(C.FILES.lig),dl(C.FILES.mat),dl(C.FILES.at)]);
-  buffers={lig,mat,at};
+  const [lig,mat,at,aval]=await Promise.all([dl(C.FILES.lig),dl(C.FILES.mat),dl(C.FILES.at),dl(C.FILES.aval)]);
+  buffers={lig,mat,at,aval};
   $('#tabLig').disabled=!lig; $('#tabMat').disabled=!mat; $('#tabAt').disabled=!at;
   $('#tabCross').disabled=!(mat&&(lig||at));
   pushAll();
@@ -148,7 +149,8 @@ function pushTo(tab){
   if(!f||!loaded[tab]) return;
   try{
     if(tab==='cross') f.contentWindow.postMessage({kind:'loadCross',mat:b.mat,lig:b.lig,at:b.at,canChange:isAdmin},'*');
-    else { const buf = tab==='lig'?b.lig:tab==='mat'?b.mat:b.at; if(buf) f.contentWindow.postMessage({kind:'loadWorkbook',buffer:buf,canChange:isAdmin},'*'); }
+    else if(tab==='at'){ if(b.at) f.contentWindow.postMessage({kind:'loadWorkbook',buffer:b.at,evalBuffer:b.aval,canChange:isAdmin},'*'); }
+    else { const buf = tab==='lig'?b.lig:b.mat; if(buf) f.contentWindow.postMessage({kind:'loadWorkbook',buffer:buf,canChange:isAdmin},'*'); }
   }catch(e){}
 }
 function pushAll(){ ['lig','mat','at','cross'].forEach(pushTo); }
@@ -171,7 +173,7 @@ $('#uploadBtn').onclick=()=>{ $('#upErr').textContent=''; $('#modal').classList.
 $('#upCancel').onclick=()=>$('#modal').classList.remove('on');
 $('#upSend').onclick=async ()=>{
   $('#upErr').textContent=''; $('#upSend').disabled=true; $('#upSend').textContent='Enviando...';
-  const jobs=[['#upLig',C.FILES.lig],['#upMat',C.FILES.mat],['#upAt',C.FILES.at]];
+  const jobs=[['#upLig',C.FILES.lig],['#upMat',C.FILES.mat],['#upAt',C.FILES.at],['#upAval',C.FILES.aval]];
   try{
     let any=false;
     for(const [sel,name] of jobs){ const f=$(sel).files[0]; if(!f)continue; any=true;
@@ -179,7 +181,7 @@ $('#upSend').onclick=async ()=>{
       if(error) throw new Error(name+': '+error.message);
     }
     if(!any){ $('#upErr').textContent='Selecione ao menos um arquivo.'; }
-    else { $('#modal').classList.remove('on'); ['#upLig','#upMat','#upAt'].forEach(s=>$(s).value=''); await loadReports(); }
+    else { $('#modal').classList.remove('on'); ['#upLig','#upMat','#upAt','#upAval'].forEach(s=>$(s).value=''); await loadReports(); }
   }catch(err){ $('#upErr').textContent='Erro ao enviar: '+err.message; }
   $('#upSend').disabled=false; $('#upSend').textContent='Enviar';
 };

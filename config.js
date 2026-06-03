@@ -10,5 +10,5 @@ window.APP_CONFIG = {
   ADMIN_EMAILS: ["lucassilveira@doctum.edu.br"],
 
   BUCKET: "relatorios",
-  FILES: { lig: "ligacoes.xls", mat: "matriculas.xlsx", at: "atendimentos.xls" }
+  FILES: { lig: "ligacoes.xls", mat: "matriculas.xlsx", at: "atendimentos.xls", aval: "avaliacoes.xls" }
 };

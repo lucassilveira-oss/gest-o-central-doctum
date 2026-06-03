@@ -112,6 +112,8 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
     <span class="filename" id="fname"></span>
     <button class="btn" id="pdfBtn" style="display:none" onclick="exportPDF()" title="Abre a impressão — escolha 'Salvar como PDF'">📄 Exportar PDF</button>
     <button class="btn ghost" id="themeBtn" onclick="toggleTheme()">☀️ Modo claro</button>
+    <button class="btn ghost" id="evalBtn" style="display:none" onclick="document.getElementById('evalFile').click()" title="Carregar relatório de avaliações (NOTA por operador)">⭐ Avaliações</button>
+    <input type="file" id="evalFile" accept=".xls,.xlsx" style="display:none">
     <button class="btn ghost" id="reloadBtn" style="display:none" onclick="document.getElementById('file').click()">Trocar arquivo</button>
     <input type="file" id="file" accept=".xls,.xlsx" style="display:none">
   </div>
@@ -142,6 +144,11 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
   <div class="printinfo" id="printinfo"></div>
 
   <div class="grid kpis" id="kpis"></div>
+
+  <div class="sec card" id="evalCard">
+    <h2>⭐ Avaliações de atendimento</h2>
+    <div id="evalBox"></div>
+  </div>
 
   <div class="sec card">
     <div class="secthead">
@@ -188,6 +195,7 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
           <th class="num" data-k="recep">Receptivos</th>
           <th class="num" data-k="efet">Com interação</th>
           <th class="num" data-k="pctEfet">% Interação</th>
+          <th class="num" data-k="nota">Nota média</th>
         </tr></thead>
         <tbody></tbody>
       </table>
@@ -222,6 +230,7 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
           <th class="num" data-k="recep">Receptivos</th>
           <th class="num" data-k="efet">Com interação</th>
           <th class="num" data-k="pctEfet">% Interação</th>
+          <th class="num" data-k="nota">Nota média</th>
         </tr></thead>
         <tbody></tbody>
       </table>
@@ -311,14 +320,14 @@ function processWorkbook(wb){
   buildMultiSelect('#rkCateg','Categoria',cat,rkCateg,renderRanking);
   buildMultiSelect('#rkMotivo','Motivo',mot,rkMotivo,renderRanking);
   $('#drop').style.display='none'; $('#dash').style.display='block';
-  $('#reloadBtn').style.display='inline-block'; $('#pdfBtn').style.display='inline-block';
+  $('#reloadBtn').style.display='inline-block'; $('#pdfBtn').style.display='inline-block'; $('#evalBtn').style.display='inline-block';
   renderAll();
 }
 
 function inRange(x,a,b){ if(!a&&!b)return true; const d=x.dt; if(!d)return false; if(a&&d<a)return false; if(b&&d>b)return false; return true; }
 function fData(){ return ALL.filter(x=>selOrigem.has(x.origem)&&selGrupo.has(x.grupo)&&selCateg.has(x.categ)&&selAtend.has(x.atend)&&selMotivo.has(x.motivo)&&inRange(x,dateStart,dateEnd)); }
 
-function renderAll(){ renderHeader(); renderKPIs(); renderChart(); renderBreakdowns(); renderDim(); renderRanking(); }
+function renderAll(){ renderHeader(); renderKPIs(); renderEval(); renderChart(); renderBreakdowns(); renderDim(); renderRanking(); }
 
 function renderHeader(){
   const d=fData(), dts=d.map(x=>x.dt).filter(Boolean);
@@ -377,6 +386,38 @@ function renderBreakdowns(){
   barBlock('#origemBox',x=>x.origem, k=> norm(k)==='ativo'?'var(--accent)':'var(--qualif)');
 }
 
+// ===== Avaliações (NOTA por operador) =====
+let hasEval=false, evalByOp=new Map(), evalByGrupo=new Map(), evalGeral={n:0,sum:0}, evalDist={1:0,2:0,3:0,4:0,5:0};
+function findCol(head,...alts){ const H=(head||[]).map(norm); for(const a of alts){const i=H.findIndex(h=>h===a);if(i>=0)return i;} for(const a of alts){const i=H.findIndex(h=>h.includes(a));if(i>=0)return i;} return -1; }
+function _ev(m,k,nota){ if(!k)return; const e=m.get(k)||{n:0,sum:0}; e.n++; e.sum+=nota; m.set(k,e); }
+function parseEvals(wb){
+  try{
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const t=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,defval:null});
+    let hi=t.findIndex(r=>r&&r.some(c=>norm(c).includes('nota'))&&r.some(c=>norm(c).includes('nome usuario')));
+    if(hi<0) hi=t.findIndex(r=>r&&r.some(c=>norm(c).includes('nota'))); if(hi<0) hi=3;
+    const head=t[hi], cN=findCol(head,'nome usuario','usuario','atendente'), cG=findCol(head,'grupo atend','grupo'), cNota=findCol(head,'nota');
+    evalByOp=new Map(); evalByGrupo=new Map(); evalGeral={n:0,sum:0}; evalDist={1:0,2:0,3:0,4:0,5:0};
+    for(let i=hi+1;i<t.length;i++){ const r=t[i]; if(!r)continue; const nota=parseFloat(String(r[cNota]==null?'':r[cNota]).replace(',','.')); if(isNaN(nota))continue;
+      _ev(evalByOp,norm(r[cN]),nota); _ev(evalByGrupo,norm(r[cG]),nota);
+      evalGeral.n++; evalGeral.sum+=nota; const rn=Math.max(1,Math.min(5,Math.round(nota))); evalDist[rn]++; }
+    hasEval=evalGeral.n>0;
+  }catch(e){ hasEval=false; }
+}
+function notaCell(e){ if(!hasEval) return '<td class="num" style="color:var(--muted)">–</td>'; if(!e||!e.n) return '<td class="num" style="color:var(--muted)">–</td>';
+  const avg=e.sum/e.n, col=avg>=4?'var(--good)':avg>=3?'var(--warn)':'var(--bad)';
+  return `<td class="num" style="color:${col};font-weight:600">${avg.toFixed(2)} <span style="color:var(--muted);font-weight:400">(${int(e.n)})</span></td>`; }
+function evalForDim(nome){ if(!hasEval)return null; if(dim==='atend')return evalByOp.get(norm(nome)); if(dim==='grupo')return evalByGrupo.get(norm(nome)); return null; }
+function renderEval(){
+  const box=$('#evalBox');
+  if(!hasEval){ box.innerHTML='<div class="sub">Sem relatório de avaliações carregado.' + (typeof IS_LEADER!=='undefined'&&IS_LEADER?'':' Use ⭐ Avaliações (ou o admin envia o arquivo de avaliações).') + '</div>'; return; }
+  const avg=evalGeral.sum/evalGeral.n, max=Math.max(...[1,2,3,4,5].map(s=>evalDist[s]),1);
+  let bars=''; for(let s=5;s>=1;s--){ const v=evalDist[s],p=v/evalGeral.n*100,col=s>=4?'var(--good)':s===3?'var(--warn)':'var(--bad)';
+    bars+=`<div class="statline"><div class="top"><span>${s} ★</span><span style="color:var(--muted)">${int(v)} · ${p.toFixed(1)}%</span></div><div class="bar-wrap" style="height:10px"><div class="bar" style="width:${v/max*100}%;background:${col}"></div></div></div>`; }
+  box.innerHTML=`<div style="display:flex;gap:28px;flex-wrap:wrap;align-items:center">
+    <div><div style="font-size:42px;font-weight:800;color:var(--good);line-height:1">${avg.toFixed(2)}</div><div class="sub">nota média geral · ${int(evalGeral.n)} avaliações</div></div>
+    <div style="flex:1;min-width:240px">${bars}</div></div>`;
+}
 function aggBy(data,keyFn){
   const m={};
   for(const x of data){ const key=keyFn(x)||'(vazio)'; const a=m[key]||(m[key]={nome:key,total:0,ativo:0,recep:0,efet:0});
@@ -384,7 +425,7 @@ function aggBy(data,keyFn){
   return Object.values(m).map(a=>({...a,pctEfet:a.total?a.efet/a.total*100:0}));
 }
 function sortRows(rows,st){ const k=st.k,dir=st.dir; return rows.sort((a,b)=>typeof a[k]==='string'?a[k].localeCompare(b[k],'pt-BR')*dir:(a[k]-b[k])*dir); }
-function rowHtml(r,maxTot,idx){
+function rowHtml(r,maxTot,idx,notaHtml){
   return `<tr>${idx!=null?`<td class="num" style="color:var(--muted);font-weight:700">${idx}</td>`:''}
     <td>${r.nome}</td>
     <td class="num"><div style="display:flex;align-items:center;gap:8px;justify-content:flex-end"><span>${int(r.total)}</span><div class="bar-wrap" style="width:46px"><div class="bar" style="width:${r.total/maxTot*100}%;background:var(--accent)"></div></div></div></td>
@@ -392,26 +433,30 @@ function rowHtml(r,maxTot,idx){
     <td class="num" style="color:var(--qualif)">${int(r.recep)}</td>
     <td class="num" style="color:var(--good)">${int(r.efet)}</td>
     <td class="num">${r.pctEfet.toFixed(1)}%</td>
+    ${notaHtml||''}
   </tr>`;
 }
 const dimKey={atend:x=>x.atend,grupo:x=>x.grupo,categ:x=>x.categ,motivo:x=>x.motivo,origem:x=>x.origem};
 function renderDim(){
-  let rows=sortRows(aggBy(fData(),dimKey[dim]),dimSort);
+  let rows=aggBy(fData(),dimKey[dim]).map(r=>{ const e=evalForDim(r.nome); return {...r, nota:e&&e.n? e.sum/e.n : -1, _ev:e}; });
+  rows=sortRows(rows,dimSort);
   const maxTot=Math.max(...rows.map(r=>r.total),1);
   $('#dimColName').textContent={atend:'Atendente',grupo:'Grupo',categ:'Categoria',motivo:'Motivo',origem:'Origem'}[dim];
   const T={total:0,ativo:0,recep:0,efet:0}; rows.forEach(r=>{T.total+=r.total;T.ativo+=r.ativo;T.recep+=r.recep;T.efet+=r.efet;});
-  $('#dimTable tbody').innerHTML=rows.map(r=>rowHtml(r,maxTot)).join('') +
-    `<tr style="font-weight:700;border-top:2px solid var(--line)"><td>TOTAL (${int(rows.length)})</td><td class="num">${int(T.total)}</td><td class="num">${int(T.ativo)}</td><td class="num">${int(T.recep)}</td><td class="num">${int(T.efet)}</td><td class="num">${(T.total?T.efet/T.total*100:0).toFixed(1)}%</td></tr>`;
+  const totNota = (dim==='atend'||dim==='grupo') ? notaCell(evalGeral.n?evalGeral:null) : '<td class="num" style="color:var(--muted)">–</td>';
+  $('#dimTable tbody').innerHTML=rows.map(r=>rowHtml(r,maxTot,null,notaCell(r._ev))).join('') +
+    `<tr style="font-weight:700;border-top:2px solid var(--line)"><td>TOTAL (${int(rows.length)})</td><td class="num">${int(T.total)}</td><td class="num">${int(T.ativo)}</td><td class="num">${int(T.recep)}</td><td class="num">${int(T.efet)}</td><td class="num">${(T.total?T.efet/T.total*100:0).toFixed(1)}%</td>${totNota}</tr>`;
 }
 
 // ===== Ranking de atendentes (independente) =====
 let rkOrigem=new Set(),rkGrupo=new Set(),rkCateg=new Set(),rkMotivo=new Set(),rkStart=null,rkEnd=null,rankSort={k:'total',dir:-1};
 function fRankData(){ return ALL.filter(x=>rkOrigem.has(x.origem)&&rkGrupo.has(x.grupo)&&rkCateg.has(x.categ)&&rkMotivo.has(x.motivo)&&inRange(x,rkStart,rkEnd)); }
 function renderRanking(){
-  let rows=sortRows(aggBy(fRankData(),x=>x.atend),rankSort);
+  let rows=aggBy(fRankData(),x=>x.atend).map(r=>{ const e=hasEval?evalByOp.get(norm(r.nome)):null; return {...r, nota:e&&e.n? e.sum/e.n : -1, _ev:e}; });
+  rows=sortRows(rows,rankSort);
   $('#rkInfo').textContent=`${int(rows.length)} atendentes · ${int(rows.reduce((s,r)=>s+r.total,0))} atendimentos`;
   const maxTot=Math.max(...rows.map(r=>r.total),1);
-  $('#rankTable tbody').innerHTML=rows.map((r,i)=>rowHtml(r,maxTot,i+1)).join('') || '<tr><td colspan="7" class="sub">Nenhum atendente no recorte.</td></tr>';
+  $('#rankTable tbody').innerHTML=rows.map((r,i)=>rowHtml(r,maxTot,i+1,notaCell(r._ev))).join('') || '<tr><td colspan="8" class="sub">Nenhum atendente no recorte.</td></tr>';
 }
 
 // ===== Controles =====
@@ -434,11 +479,16 @@ function handleFile(file){
   fr.readAsArrayBuffer(file);
 }
 // permite que o painel de gestão envie a planilha por mensagem (uso embutido em iframe)
-window.addEventListener('message',function(ev){ var d=ev.data||{}; if(d&&d.kind==='loadWorkbook'&&d.buffer){ try{ processWorkbook(XLSX.read(d.buffer,{type:'array'})); }catch(err){ alert('Erro ao processar a planilha de atendimentos: '+err.message); }
-  if(d.canChange===false){ var rb=document.getElementById('reloadBtn'); if(rb)rb.style.display='none'; } } });
+window.addEventListener('message',function(ev){ var d=ev.data||{}; if(d&&d.kind==='loadWorkbook'&&d.buffer){
+  try{ processWorkbook(XLSX.read(d.buffer,{type:'array'}));
+    if(d.evalBuffer){ parseEvals(XLSX.read(d.evalBuffer,{type:'array'})); renderEval(); renderDim(); renderRanking(); }
+  }catch(err){ alert('Erro ao processar a planilha de atendimentos: '+err.message); }
+  if(d.canChange===false){ ['reloadBtn','evalBtn'].forEach(id=>{var b=document.getElementById(id); if(b)b.style.display='none';}); } } });
+function handleEvalFile(file){ const fr=new FileReader(); fr.onload=e=>{ try{ parseEvals(XLSX.read(e.target.result,{type:'array'})); renderEval(); renderDim(); renderRanking(); }catch(err){ alert('Não consegui ler as avaliações.\n\n'+err.message); } }; fr.readAsArrayBuffer(file); }
 const drop=$('#drop');
 drop.onclick=()=>$('#file').click();
 $('#file').onchange=e=>{ if(e.target.files[0]) handleFile(e.target.files[0]); };
+$('#evalFile').onchange=e=>{ if(e.target.files[0]) handleEvalFile(e.target.files[0]); };
 ['dragover','dragenter'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over');}));
 ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over');}));
 drop.addEventListener('drop',e=>{ const f=e.dataTransfer.files[0]; if(f) handleFile(f); });
