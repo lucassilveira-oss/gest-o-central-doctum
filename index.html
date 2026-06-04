@@ -81,11 +81,11 @@
 
 <div id="wrap" style="display:none">
   <div id="status">Faça login para começar.</div>
-  <iframe id="frameLig" src="dashboard-standalone.html"></iframe>
-  <iframe id="frameMat" src="dashboard-matriculas-standalone.html"></iframe>
-  <iframe id="frameAt" src="dashboard-atendimentos-standalone.html"></iframe>
-  <iframe id="frameCross" src="dashboard-cruzamento-standalone.html"></iframe>
-  <iframe id="frameTV" src="painel-tv-standalone.html" allowfullscreen allow="fullscreen"></iframe>
+  <iframe id="frameLig" data-src="dashboard-standalone.html"></iframe>
+  <iframe id="frameMat" data-src="dashboard-matriculas-standalone.html"></iframe>
+  <iframe id="frameAt" data-src="dashboard-atendimentos-standalone.html"></iframe>
+  <iframe id="frameCross" data-src="dashboard-cruzamento-standalone.html"></iframe>
+  <iframe id="frameTV" data-src="painel-tv-standalone.html" allowfullscreen allow="fullscreen"></iframe>
 </div>
 
 <!-- MODAL UPLOAD (admin) -->
@@ -179,9 +179,11 @@ function pushTo(tab){
 }
 function pushAll(){ KEYS.forEach(pushTo); }
 KEYS.forEach(t=>{ frame(t).addEventListener('load',()=>{ loaded[t]=true; pushTo(t); }); });
+// carrega o dashboard só quando a aba é aberta (economiza memória — essencial no celular)
+function ensureLoaded(t){ const f=frame(t); if(f && !f.getAttribute('src')){ f.setAttribute('src', f.getAttribute('data-src')); } }
 
 // ---- TABS ----
-function show(t){ KEYS.forEach(x=>{ $('#'+FRID[x]).classList.toggle('on',x===t); $('#'+TBID[x]).classList.toggle('on',x===t); }); }
+function show(t){ ensureLoaded(t); KEYS.forEach(x=>{ $('#'+FRID[x]).classList.toggle('on',x===t); $('#'+TBID[x]).classList.toggle('on',x===t); }); }
 KEYS.forEach(t=>{ $('#'+TBID[t]).onclick=()=>{ if(!$('#'+TBID[t]).disabled) show(t); }; });
 $('#reloadBtn').onclick=loadReports;
 
