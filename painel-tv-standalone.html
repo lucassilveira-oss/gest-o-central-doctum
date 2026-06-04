@@ -64,6 +64,10 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
   .mstat .v{font-size:4.4vw;font-weight:900;color:var(--ac);line-height:1.02}
   .mstat .p{font-size:.8vw;color:var(--muted)}
   /* eficiência */
+  .mtop3{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:1vh 1.8vw;display:flex;align-items:center;gap:2vw;flex-wrap:wrap}
+  .mtop3 .t3lbl{font-size:1.25vw;font-weight:800;color:var(--ac);white-space:nowrap}
+  .mtop3 .t3i{font-size:1.5vw;font-weight:700;text-transform:capitalize}
+  .mtop3 .t3i em{font-style:normal;color:var(--muted);font-size:1.05vw;margin-left:.3vw;text-transform:none}
   .mefic{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:1.2vh 1.8vw;display:flex;align-items:center;gap:2.2vw}
   .mefic .et{font-size:1.25vw;font-weight:800;color:var(--ac);white-space:nowrap}
   .efstat{text-align:center;flex:none} .efstat .v{font-size:3vw;font-weight:900;line-height:1} .efstat .k{font-size:.8vw;color:var(--muted);font-weight:700;text-transform:uppercase}
@@ -209,12 +213,19 @@ function buildSlides(matBuf,ligBuf,avalBuf){
     const gd=MAT.filter(x=>x.grad&&x.dMat), cntD=(a,b)=>gd.filter(x=>x.dMat>=a&&x.dMat<=b).length;
     const mEnd=new Date(Math.min(w.e.getTime(),twe.getTime()));
     const totalIntake=MAT.filter(x=>x.grad&&isMatr(x.ns)).length;  // matriculados graduação (status Matriculado)
-    let efCall=0, efPct=0; const hasLig=!!ligBuf;
-    if(ligBuf){ const att=attendedPhones(ligBuf); efCall=MAT.filter(x=>x.grad&&isMatr(x.ns)&&x.phone&&att.has(x.phone)).length; efPct=totalIntake?efCall/totalIntake*100:0; }
-    slides.push({type:'macro',ic:'📊',ac:'#22d3ee',title:'Visão Geral · Graduação',sub:'Matrículas do Intake (por Data da Matrícula)',
+    let efCall=0, efPct=0, topEfic=[]; const hasLig=!!ligBuf;
+    if(ligBuf){ const att=attendedPhones(ligBuf);
+      const gmat=MAT.filter(x=>x.grad&&isMatr(x.ns));
+      efCall=gmat.filter(x=>x.phone&&att.has(x.phone)).length; efPct=totalIntake?efCall/totalIntake*100:0;
+      const m={}; for(const x of gmat){ const op=x.op; if(!op||/\(sem operador\)|nao registrado/.test(norm(op)))continue; const e=m[op]||(m[op]={nome:op,total:0,call:0}); e.total++; if(x.phone&&att.has(x.phone))e.call++; }
+      let arr=Object.values(m).map(e=>({...e,pct:e.total?e.call/e.total*100:0}));
+      let f=arr.filter(e=>e.total>=3); if(f.length<3)f=arr;
+      topEfic=f.sort((a,b)=>b.pct-a.pct||b.call-a.call).slice(0,3);
+    }
+    slides.push({type:'macro',ic:'📊',ac:'#22d3ee',title:'Visão Geral · Graduação  |  Matrículas do Intake (por Data da Matrícula)',sub:'',
       macro:{ totalIntake, hoje:gd.filter(x=>sd(x.dMat,t0)).length, ontem:gd.filter(x=>sd(x.dMat,yst)).length,
               semana:cntD(tws,twe), semanaPassada:cntD(lws,lwsame), mes:cntD(w.s,mEnd),
-              efTotal:totalIntake, efCall, efPct, hasLig }});
+              efTotal:totalIntake, efCall, efPct, hasLig, topEfic }});
     slides.push({ic:'🏆',ac:'#f59e0b',title:'Matrículas do Intake',sub:'Top 10 Vendedores',unit:'matrículas',fmt:int,
       rows:aggCount(x=>x.grad&&(isMatr(x.ns)||isTranc(x.ns)))});
     slides.push({ic:'💰',ac:'#10b981',title:'Maiores Comissões no Intake',sub:'Top 10 + Ricos da central',unit:'',fmt:money,
@@ -245,18 +256,21 @@ function renderMacro(s){
         <div class="gaugewrap"><div class="grow"><span>Com ligação atendida: <b style="color:${efCol}">${int(m.efCall)}</b> · <b style="color:${efCol}">${m.efPct.toFixed(1)}%</b></span><span class="gmeta">meta 50%</span></div>
           <div class="gtrack"><div class="gfill" style="width:${Math.min(m.efPct,100)}%;background:${efCol}"></div><div class="gmark"></div></div></div></div>`
     : `<div class="mefic"><div class="et">⚙️ Eficiência</div><div class="efstat"><div class="v">${int(m.efTotal)}</div><div class="k">Total de Matriculados</div></div><div class="gaugewrap" style="color:var(--muted)">Carregue o relatório de Ligações para ver a eficiência (matriculados com ligação atendida × meta 50%).</div></div>`;
+  const t3 = (m.topEfic&&m.topEfic.length)
+    ? `<div class="mtop3"><span class="t3lbl">🏅 Top 3 em eficiência</span>${m.topEfic.map((e,i)=>`<span class="t3i">${['🥇','🥈','🥉'][i]} <b>${e.nome.toLowerCase()}</b> <em>${e.pct.toFixed(0)}% (${int(e.call)}/${int(e.total)})</em></span>`).join('')}</div>`
+    : '';
   $('#grid').innerHTML=`<div class="macro">
     <div class="mtop">${card('Matrículas Totais Intake',m.totalIntake,'status Matriculado')}${card('Hoje',m.hoje,'data da matrícula')}${card('Esta semana',m.semana,'segunda até hoje')}${card('Este mês',m.mes,'mês de comissão (11→10)')}</div>
     <div class="mbot">${cmp('Ontem × Hoje',m.ontem,m.hoje,'Ontem','Hoje')}${cmp('Semana passada × Esta semana',m.semanaPassada,m.semana,'Sem. passada','Esta semana (mesmo período)')}</div>
-    ${efic}</div>`;
+    ${efic}${t3}</div>`;
 }
 function medal(i){ return i===0?'🥇':i===1?'🥈':i===2?'🥉':String(i+1); }
 function renderSlide(){
   const s=slides[idx]; if(!s)return;
   document.documentElement.style.setProperty('--ac',s.ac);
   $('#sIcon').textContent=s.ic; $('#sTitle').textContent=s.title; $('#sSub').textContent=s.sub;
-  $('#sTitle').style.fontSize = s.type==='macro' ? '2.8vw' : '4.4vw';
-  $('#sIcon').style.fontSize = s.type==='macro' ? '3.4vw' : '5vw';
+  $('#sTitle').style.fontSize = s.type==='macro' ? '2vw' : '4.4vw';
+  $('#sIcon').style.fontSize = s.type==='macro' ? '2.6vw' : '5vw';
   if(s.type==='macro'){ $('#grid').style.display='block'; renderMacro(s); }
   else { $('#grid').style.display='grid';
     const top=s.rows.slice(0,10), max=Math.max(...top.map(r=>r.val),1);
