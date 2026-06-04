@@ -451,8 +451,9 @@ function renderKPIs(){
   const tra=d.filter(x=>x.nsMat.includes('tranc')).length;
   const pago=d.filter(x=>x.nsBol==='pago').length;
   const pend=d.filter(x=>x.nsBol.includes('venc')||x.nsBol.includes('aberto')).length;
-  const valor=d.reduce((s,x)=>s+x.vTicket,0);
-  const pagantes=d.filter(x=>x.vTicket>0).length;
+  const dTk=d.filter(x=>!norm(x.curso).includes('medicina'));  // ticket médio desconsidera o curso de Medicina
+  const valor=dTk.reduce((s,x)=>s+x.vTicket,0);
+  const pagantes=dTk.filter(x=>x.vTicket>0).length;
   // "Matrículas geradas" SEMPRE pela Data da Pré-matrícula (independe da base de data escolhida)
   const geradas=fDataNoDate().filter(x=>inDate(x.dPre)).length;
   const pct=v=>n?(v/n*100).toFixed(1):0;
@@ -463,7 +464,7 @@ function renderKPIs(){
     {label:'Trancados',val:int(tra),foot:pct(tra)+'%',cls:'bad'},
     {label:'Taxa de matr. pagas',val:pct(pago)+'%',foot:`${int(pago)} de ${int(n)} pagas`,cls:'good'},
     {label:'Boletos pendentes',val:int(pend),foot:'vencidos + em aberto',cls:'bad'},
-    {label:'Ticket médio (R$)',val:real(pagantes?valor/pagantes:0),foot:`${int(pagantes)} no cálculo · Pós=emitido`,cls:'accent'},
+    {label:'Ticket médio (R$)',val:real(pagantes?valor/pagantes:0),foot:`${int(pagantes)} no cálculo`,cls:'accent'},
   ];
   $('#kpis').innerHTML=cards.map(c=>`<div class="card kpi ${c.cls}"><div class="label">${c.label}</div><div class="val">${c.val}</div><div class="foot">${c.foot}</div></div>`).join('');
 }
