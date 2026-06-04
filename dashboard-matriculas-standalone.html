@@ -498,15 +498,22 @@ function renderEvolucao(){
   const now=new Date(), t=new Date(now.getFullYear(),now.getMonth(),now.getDate());
   const yest=new Date(t); yest.setDate(t.getDate()-1);
   const sameDay=ref=>datas.filter(x=>x.getFullYear()===ref.getFullYear()&&x.getMonth()===ref.getMonth()&&x.getDate()===ref.getDate()).length;
-  const inRangeC=(a,b)=>datas.filter(x=>x>=a&&x<b).length;
-  const tws=weekStart(t), twe=new Date(tws); twe.setDate(tws.getDate()+7);
+  const eod=x=>{ const d=new Date(x); d.setHours(23,59,59,999); return d; };
+  const inRangeC=(a,b)=>datas.filter(x=>x>=a&&x<=b).length;
+  // Semana: mesmo período decorrido — segunda→hoje vs segunda→mesmo dia da semana passada
+  const tws=weekStart(t), twe=eod(t);
   const lws=new Date(tws); lws.setDate(tws.getDate()-7);
-  const inMonth=(yr,mo)=>datas.filter(x=>x.getFullYear()===yr&&x.getMonth()===mo).length;
-  const lm=new Date(t.getFullYear(),t.getMonth()-1,1);
+  const lwe=eod(new Date(t.getFullYear(),t.getMonth(),t.getDate()-7));
+  // Mês: data com data — dia 1→hoje vs dia 1→mesmo dia do mês passado
+  const dd=t.getDate();
+  const tmStart=new Date(t.getFullYear(),t.getMonth(),1), tmEnd=eod(t);
+  const lmDays=new Date(t.getFullYear(),t.getMonth(),0).getDate();
+  const lmStart=new Date(t.getFullYear(),t.getMonth()-1,1);
+  const lmEnd=eod(new Date(t.getFullYear(),t.getMonth()-1,Math.min(dd,lmDays)));
   const blocks=[
     {title:'Ontem × Hoje', pl:'Ontem', sl:'Hoje', past:sameDay(yest), pres:sameDay(t)},
-    {title:'Semana passada × Essa semana', pl:'Sem. passada', sl:'Essa semana', past:inRangeC(lws,tws), pres:inRangeC(tws,twe)},
-    {title:'Mês passado × Esse mês', pl:'Mês passado', sl:'Esse mês', past:inMonth(lm.getFullYear(),lm.getMonth()), pres:inMonth(t.getFullYear(),t.getMonth())},
+    {title:'Semana passada × Essa semana', pl:'Sem. passada (mesmo período)', sl:'Essa semana', past:inRangeC(lws,lwe), pres:inRangeC(tws,twe)},
+    {title:'Mês passado × Esse mês', pl:'Mês passado (até dia '+dd+')', sl:'Esse mês', past:inRangeC(lmStart,lmEnd), pres:inRangeC(tmStart,tmEnd)},
   ];
   $('#evolucao').innerHTML=blocks.map(b=>{
     const max=Math.max(b.past,b.pres,1), up=b.pres>=b.past;
