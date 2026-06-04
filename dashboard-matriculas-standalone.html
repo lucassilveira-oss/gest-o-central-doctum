@@ -378,22 +378,27 @@ function processWorkbook(wb){
   const find=(...alts)=>{ for(const a of alts){ const i=head.findIndex(h=>h===a); if(i>=0)return i; } for(const a of alts){ const i=head.findIndex(h=>h.includes(a)); if(i>=0)return i; } return -1; };
   const ci={
     mod:find('modalidade'), uni:find('unidade'), curso:find('curso'), op:find('operador da matricula','operador'),
-    nome:find('nome'), cpf:find('cpf'), valor:find('valor pago matricula','valor pago'),
+    nome:find('nome'), cpf:find('cpf'), valor:find('valor pago matricula','valor pago'), emit:find('valor emitido matricula','valor emitido'),
     sMat:find('status da matricula'), sBol:find('status do boleto'),
     dPre:find('data da pre matricula'), dPag:find('data pagamento','data do pagamento'), dMat:find('data da matricula'),
   };
   const numOf=v=>{ if(v==null)return 0; if(typeof v==='number')return v; const s=String(v).replace(/[^\d,.-]/g,'').replace(/\.(?=\d{3}(\D|$))/g,'').replace(',','.'); return parseFloat(s)||0; };
   ALL=rows.slice(hi+1).map((r,i)=>({r,raw:rowsRaw[hi+1+i]||[]})).filter(o=>o.r&&o.r[ci.nome]&&String(o.r[ci.nome]).trim()!=='').map(({r,raw})=>{
     const sm=String(r[ci.sMat]||'').trim(), sb=String(r[ci.sBol]||'').trim();
+    const mod=String(r[ci.mod]||'(sem modalidade)').trim();
+    const vPago = ci.valor>=0 ? numOf(raw[ci.valor]!=null?raw[ci.valor]:r[ci.valor]) : 0;
+    const vEmit = ci.emit>=0 ? numOf(raw[ci.emit]!=null?raw[ci.emit]:r[ci.emit]) : 0;
+    // Ticket médio: Pós-graduação EaD usa Valor Emitido; demais usam Valor Pago
+    const vTicket = norm(mod).includes('pos gradua') ? vEmit : vPago;
     return {
-      mod:String(r[ci.mod]||'(sem modalidade)').trim(),
+      mod,
       uni:String(r[ci.uni]||'(sem unidade)').trim(),
       curso:String(r[ci.curso]||'(sem curso)').trim(),
       op:String(r[ci.op]||'(sem operador)').trim(),
       cpf: ci.cpf>=0 ? String(r[ci.cpf]||'').replace(/\D/g,'') : '',
       sMat:sm, sBol:sb, nsMat:norm(sm), nsBol:norm(sb),
       dPre:parseDateBR(r[ci.dPre]), dPag:parseDateBR(r[ci.dPag]), dMat:parseDateBR(r[ci.dMat]),
-      valor: ci.valor>=0 ? numOf(raw[ci.valor]!=null?raw[ci.valor]:r[ci.valor]) : 0,
+      valor: vPago, vTicket,
     };
   });
   const uniq=k=>[...new Set(ALL.map(x=>x[k]))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
@@ -446,8 +451,8 @@ function renderKPIs(){
   const tra=d.filter(x=>x.nsMat.includes('tranc')).length;
   const pago=d.filter(x=>x.nsBol==='pago').length;
   const pend=d.filter(x=>x.nsBol.includes('venc')||x.nsBol.includes('aberto')).length;
-  const valor=d.reduce((s,x)=>s+x.valor,0);
-  const pagantes=d.filter(x=>x.valor>0).length;
+  const valor=d.reduce((s,x)=>s+x.vTicket,0);
+  const pagantes=d.filter(x=>x.vTicket>0).length;
   // "Matrículas geradas" SEMPRE pela Data da Pré-matrícula (independe da base de data escolhida)
   const geradas=fDataNoDate().filter(x=>inDate(x.dPre)).length;
   const pct=v=>n?(v/n*100).toFixed(1):0;
@@ -458,7 +463,7 @@ function renderKPIs(){
     {label:'Trancados',val:int(tra),foot:pct(tra)+'%',cls:'bad'},
     {label:'Taxa de matr. pagas',val:pct(pago)+'%',foot:`${int(pago)} de ${int(n)} pagas`,cls:'good'},
     {label:'Boletos pendentes',val:int(pend),foot:'vencidos + em aberto',cls:'bad'},
-    {label:'Ticket médio (R$)',val:real(pagantes?valor/pagantes:0),foot:`${int(pagantes)} pagantes`,cls:'accent'},
+    {label:'Ticket médio (R$)',val:real(pagantes?valor/pagantes:0),foot:`${int(pagantes)} no cálculo · Pós=emitido`,cls:'accent'},
   ];
   $('#kpis').innerHTML=cards.map(c=>`<div class="card kpi ${c.cls}"><div class="label">${c.label}</div><div class="val">${c.val}</div><div class="foot">${c.foot}</div></div>`).join('');
 }
@@ -542,7 +547,7 @@ function renderDim(){
     if(x.nsMat.includes('pre'))a.pre++;
     if(x.nsMat.includes('tranc'))a.trancado++;
     if(x.nsBol==='pago')a.pago++;
-    if(x.valor>0){ a.valor+=x.valor; a.pagantes++; }
+    if(x.vTicket>0){ a.valor+=x.vTicket; a.pagantes++; }
   }
   let rows=Object.values(m).map(a=>({...a,
     pctPagas:a.total?a.pago/a.total*100:0,
@@ -582,7 +587,7 @@ function renderRanking(){
     if(x.nsMat.includes('pre'))a.pre++;
     if(x.nsMat.includes('tranc'))a.trancado++;
     if(x.nsBol==='pago')a.pago++;
-    if(x.valor>0){ a.valor+=x.valor; a.pagantes++; }
+    if(x.vTicket>0){ a.valor+=x.vTicket; a.pagantes++; }
   }
   let rows=Object.values(m).map(a=>({...a,pctPagas:a.total?a.pago/a.total*100:0,ticket:a.pagantes?a.valor/a.pagantes:0}));
   const k=rankSort.k,dir=rankSort.dir;
