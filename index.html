@@ -74,6 +74,7 @@
     <button class="tab" id="tabTV" data-t="tv">📺 TV</button>
     <button class="btn ghost" id="reloadBtn" title="Recarregar relatórios do servidor">↻</button>
     <button class="btn" id="uploadBtn" style="display:none">⬆ Atualizar relatórios</button>
+    <button class="btn ghost" id="fullBtn" onclick="toggleFull()">⛶ Tela cheia</button>
     <span class="who" id="who"></span>
     <button class="btn ghost" id="logoutBtn">Sair</button>
   </div>
@@ -186,6 +187,11 @@ function ensureLoaded(t){ const f=frame(t); if(f && !f.getAttribute('src')){ f.s
 function show(t){ ensureLoaded(t); KEYS.forEach(x=>{ $('#'+FRID[x]).classList.toggle('on',x===t); $('#'+TBID[x]).classList.toggle('on',x===t); }); }
 KEYS.forEach(t=>{ $('#'+TBID[t]).onclick=()=>{ if(!$('#'+TBID[t]).disabled) show(t); }; });
 $('#reloadBtn').onclick=loadReports;
+// Tela cheia (alterna o texto do botão)
+function isFull(){ return document.fullscreenElement||document.webkitFullscreenElement; }
+function toggleFull(){ try{ if(isFull()){ (document.exitFullscreen||document.webkitExitFullscreen).call(document); } else { const el=document.documentElement; (el.requestFullscreen||el.webkitRequestFullscreen).call(el); } }catch(e){} }
+function _fullLbl(){ const b=$('#fullBtn'); if(b) b.textContent=isFull()?'🗗 Modo normal':'⛶ Tela cheia'; }
+document.addEventListener('fullscreenchange',_fullLbl); document.addEventListener('webkitfullscreenchange',_fullLbl);
 
 // ---- UPLOAD (admin) ----
 $('#uploadBtn').onclick=()=>{ $('#upErr').textContent=''; $('#modal').classList.add('on'); };
