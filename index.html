@@ -71,6 +71,7 @@
     <button class="tab" id="tabAt" data-t="at">💬 Atendimentos</button>
     <button class="tab" id="tabMat" data-t="mat">🎓 Matrículas</button>
     <button class="tab" id="tabCross" data-t="cross">🔗 Cruzamento</button>
+    <button class="tab" id="tabTV" data-t="tv">📺 TV</button>
     <button class="btn ghost" id="reloadBtn" title="Recarregar relatórios do servidor">↻</button>
     <button class="btn" id="uploadBtn" style="display:none">⬆ Atualizar relatórios</button>
     <span class="who" id="who"></span>
@@ -84,6 +85,7 @@
   <iframe id="frameMat" src="dashboard-matriculas-standalone.html"></iframe>
   <iframe id="frameAt" src="dashboard-atendimentos-standalone.html"></iframe>
   <iframe id="frameCross" src="dashboard-cruzamento-standalone.html"></iframe>
+  <iframe id="frameTV" src="painel-tv-standalone.html" allowfullscreen allow="fullscreen"></iframe>
 </div>
 
 <!-- MODAL UPLOAD (admin) -->
@@ -107,7 +109,7 @@
 const C = window.APP_CONFIG;
 const sb = supabase.createClient(C.SUPABASE_URL, C.SUPABASE_ANON_KEY);
 const $ = s => document.querySelector(s);
-let isAdmin=false, buffers={lig:null,mat:null,at:null,aval:null}, loaded={lig:false,mat:false,at:false,cross:false};
+let isAdmin=false, buffers={lig:null,mat:null,at:null,aval:null}, loaded={lig:false,mat:false,at:false,cross:false,tv:false}, lastUpdMs=null;
 
 // ---- AUTH ----
 $('#loginForm').addEventListener('submit', async e=>{
@@ -138,50 +140,49 @@ async function loadReports(){
   $('#status').style.display='flex'; $('#status').textContent='Carregando relatórios do servidor...';
   const [lig,mat,at,aval]=await Promise.all([dl(C.FILES.lig),dl(C.FILES.mat),dl(C.FILES.at),dl(C.FILES.aval)]);
   buffers={lig,mat,at,aval};
+  await renderLastUpdated();
   $('#tabLig').disabled=!lig; $('#tabMat').disabled=!mat; $('#tabAt').disabled=!at;
   $('#tabCross').disabled=!(mat&&(lig||at));
+  $('#tabTV').disabled=!(mat||lig||aval);
   pushAll();
   const first = lig?'lig':mat?'mat':at?'at':null;
   if(first){ $('#status').style.display='none'; show(first); }
   else $('#status').textContent='Nenhum relatório no servidor ainda.'+(isAdmin?' Clique em "Atualizar relatórios" para enviar.':' Peça ao admin para enviar.');
-  renderLastUpdated();
 }
 
 // "Atualizado em": última modificação entre os arquivos do bucket
 async function renderLastUpdated(){
-  const el=$('#lastUpd'); if(!el) return;
+  const el=$('#lastUpd');
   try{
     const {data}=await sb.storage.from(C.BUCKET).list('',{limit:200});
     const times=(data||[]).map(o=>o.updated_at||o.created_at||(o.metadata&&o.metadata.lastModified)).filter(Boolean).map(t=>new Date(t).getTime()).filter(n=>!isNaN(n));
-    if(!times.length){ el.textContent=''; return; }
-    const d=new Date(Math.max(...times)), p=n=>String(n).padStart(2,'0');
-    el.textContent=`Atualizado em: ${p(d.getDate())}/${p(d.getMonth()+1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
-  }catch(e){ el.textContent=''; }
+    if(!times.length){ lastUpdMs=null; if(el)el.textContent=''; return; }
+    lastUpdMs=Math.max(...times); const d=new Date(lastUpdMs), p=n=>String(n).padStart(2,'0');
+    if(el)el.textContent=`Atualizado em: ${p(d.getDate())}/${p(d.getMonth()+1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  }catch(e){ if(el)el.textContent=''; }
 }
 
 // envia os buffers já baixados para os iframes que já carregaram
+const KEYS=['lig','mat','at','cross','tv'];
+const FRID={lig:'frameLig',mat:'frameMat',at:'frameAt',cross:'frameCross',tv:'frameTV'};
+const TBID={lig:'tabLig',mat:'tabMat',at:'tabAt',cross:'tabCross',tv:'tabTV'};
+function frame(t){ return $('#'+FRID[t]); }
 function pushTo(tab){
   const f=frame(tab), b=buffers;
   if(!f||!loaded[tab]) return;
   try{
     if(tab==='cross') f.contentWindow.postMessage({kind:'loadCross',mat:b.mat,lig:b.lig,at:b.at,canChange:isAdmin},'*');
+    else if(tab==='tv') f.contentWindow.postMessage({kind:'loadTV',mat:b.mat,lig:b.lig,aval:b.aval,updated:lastUpdMs},'*');
     else if(tab==='at'){ if(b.at) f.contentWindow.postMessage({kind:'loadWorkbook',buffer:b.at,evalBuffer:b.aval,canChange:isAdmin},'*'); }
     else { const buf = tab==='lig'?b.lig:b.mat; if(buf) f.contentWindow.postMessage({kind:'loadWorkbook',buffer:buf,canChange:isAdmin},'*'); }
   }catch(e){}
 }
-function pushAll(){ ['lig','mat','at','cross'].forEach(pushTo); }
-function frame(t){ return $('#frame'+(t==='lig'?'Lig':t==='mat'?'Mat':t==='at'?'At':'Cross')); }
-
-['lig','mat','at','cross'].forEach(t=>{ frame(t).addEventListener('load',()=>{ loaded[t]=true; pushTo(t); }); });
+function pushAll(){ KEYS.forEach(pushTo); }
+KEYS.forEach(t=>{ frame(t).addEventListener('load',()=>{ loaded[t]=true; pushTo(t); }); });
 
 // ---- TABS ----
-function show(t){
-  ['lig','mat','at','cross'].forEach(x=>{ frame(x).classList.toggle('on',x===t); $('#tab'+(x==='lig'?'Lig':x==='mat'?'Mat':x==='at'?'At':'Cross')).classList.toggle('on',x===t); });
-}
-$('#tabLig').onclick=()=>{ if(!$('#tabLig').disabled) show('lig'); };
-$('#tabMat').onclick=()=>{ if(!$('#tabMat').disabled) show('mat'); };
-$('#tabAt').onclick=()=>{ if(!$('#tabAt').disabled) show('at'); };
-$('#tabCross').onclick=()=>{ if(!$('#tabCross').disabled) show('cross'); };
+function show(t){ KEYS.forEach(x=>{ $('#'+FRID[x]).classList.toggle('on',x===t); $('#'+TBID[x]).classList.toggle('on',x===t); }); }
+KEYS.forEach(t=>{ $('#'+TBID[t]).onclick=()=>{ if(!$('#'+TBID[t]).disabled) show(t); }; });
 $('#reloadBtn').onclick=loadReports;
 
 // ---- UPLOAD (admin) ----
