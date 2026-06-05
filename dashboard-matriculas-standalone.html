@@ -512,8 +512,8 @@ function renderEvolucao(){
   const lmEnd=eod(new Date(t.getFullYear(),t.getMonth()-1,Math.min(dd,lmDays)));
   const blocks=[
     {title:'Ontem × Hoje', pl:'Ontem', sl:'Hoje', past:sameDay(yest), pres:sameDay(t)},
-    {title:'Semana passada × Essa semana', pl:'Sem. passada (mesmo período)', sl:'Essa semana', past:inRangeC(lws,lwe), pres:inRangeC(tws,twe)},
-    {title:'Mês passado × Esse mês', pl:'Mês passado (até dia '+dd+')', sl:'Esse mês', past:inRangeC(lmStart,lmEnd), pres:inRangeC(tmStart,tmEnd)},
+    {title:'Semana passada × Essa semana', pl:'Sem. passada', sl:'Essa semana', past:inRangeC(lws,lwe), pres:inRangeC(tws,twe)},
+    {title:'Mês passado × Esse mês', pl:'Mês passado', sl:'Esse mês', past:inRangeC(lmStart,lmEnd), pres:inRangeC(tmStart,tmEnd)},
   ];
   $('#evolucao').innerHTML=blocks.map(b=>{
     const max=Math.max(b.past,b.pres,1), up=b.pres>=b.past;
