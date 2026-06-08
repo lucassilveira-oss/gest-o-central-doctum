@@ -58,10 +58,10 @@ t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=xk(e,t);t.type="arra
   .upd .dt{font-size:1.7vw;font-weight:800;line-height:1.15;font-variant-numeric:tabular-nums}
   /* tela macro */
   .macro{flex:1;display:flex;flex-direction:column;gap:2vh;min-height:0}
-  .mtop{display:grid;grid-template-columns:repeat(4,1fr);gap:1.4vw}
+  .mtop{display:grid;grid-template-columns:repeat(5,1fr);gap:1.1vw}
   .mstat{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:1.3vh 1vw;text-align:center;display:flex;flex-direction:column;justify-content:center}
   .mstat .k{font-size:.95vw;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.5px}
-  .mstat .v{font-size:4.4vw;font-weight:900;color:var(--ac);line-height:1.02}
+  .mstat .v{font-size:3.6vw;font-weight:900;color:var(--ac);line-height:1.02}
   .mstat .p{font-size:.8vw;color:var(--muted)}
   /* eficiência */
   .mtop3{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:1vh 1.8vw;display:flex;align-items:center;gap:2vw;flex-wrap:wrap}
@@ -207,12 +207,19 @@ function buildSlides(matBuf,ligBuf,avalBuf){
     // ── 1ª tela: visão macro (graduação, por Data da Matrícula) ──
     const now=new Date(), t0=new Date(now.getFullYear(),now.getMonth(),now.getDate());
     const sd=(d,r)=>d&&d.getFullYear()===r.getFullYear()&&d.getMonth()===r.getMonth()&&d.getDate()===r.getDate();
-    const yst=new Date(t0); yst.setDate(t0.getDate()-1);
+    const isMon=t0.getDay()===1;  // 2ª feira: comparar com sexta (sinaliza)
+    const yst=new Date(t0); yst.setDate(t0.getDate()-(isMon?3:1));
+    const ontemLabel=isMon?'Sexta':'Ontem';
     const tws=weekStart(t0), twe=new Date(t0); twe.setHours(23,59,59,999);
     const lws=new Date(tws); lws.setDate(tws.getDate()-7); const lwsame=new Date(t0); lwsame.setDate(t0.getDate()-7); lwsame.setHours(23,59,59,999);
     const gd=MAT.filter(x=>x.grad&&x.dMat), cntD=(a,b)=>gd.filter(x=>x.dMat>=a&&x.dMat<=b).length;
     const mEnd=new Date(Math.min(w.e.getTime(),twe.getTime()));
     const totalIntake=MAT.filter(x=>x.grad&&isMatr(x.ns)).length;  // matriculados graduação (status Matriculado)
+    // KPIs (graduação) — mesmas definições da tela de Matrículas
+    const g=MAT.filter(x=>x.grad);
+    const geradas=g.length, pre=g.filter(x=>isPre(x.ns)).length, matriculado=g.filter(x=>isMatr(x.ns)).length;
+    const pago=g.filter(x=>x.nsBol==='pago').length, pend=g.filter(x=>x.nsBol.includes('venc')||x.nsBol.includes('aberto')).length;
+    const taxaPagas=geradas?pago/geradas*100:0;
     let efCall=0, efPct=0, topEfic=[]; const hasLig=!!ligBuf;
     if(ligBuf){ const att=attendedPhones(ligBuf);
       const gmat=MAT.filter(x=>x.grad&&isMatr(x.ns));
@@ -223,8 +230,9 @@ function buildSlides(matBuf,ligBuf,avalBuf){
       topEfic=f.sort((a,b)=>b.pct-a.pct||b.call-a.call).slice(0,3);
     }
     slides.push({type:'macro',ic:'📊',ac:'#22d3ee',title:'Visão Geral · Graduação  |  Matrículas do Intake (por Data da Matrícula)',sub:'',
-      macro:{ totalIntake, hoje:gd.filter(x=>sd(x.dMat,t0)).length, ontem:gd.filter(x=>sd(x.dMat,yst)).length,
-              semana:cntD(tws,twe), semanaPassada:cntD(lws,lwsame), mes:cntD(w.s,mEnd),
+      macro:{ geradas, pre, matriculado, taxaPagas, pago, pend,
+              hoje:gd.filter(x=>sd(x.dMat,t0)).length, ontem:gd.filter(x=>sd(x.dMat,yst)).length, ontemLabel,
+              semana:cntD(tws,twe), semanaPassada:cntD(lws,lwsame),
               efTotal:totalIntake, efCall, efPct, hasLig, topEfic }});
     slides.push({ic:'🏆',ac:'#f59e0b',title:'Matrículas do Intake',sub:'Top 10 Vendedores',unit:'matrículas',fmt:int,
       rows:aggCount(x=>x.grad&&(isMatr(x.ns)||isTranc(x.ns)))});
@@ -242,7 +250,7 @@ function buildSlides(matBuf,ligBuf,avalBuf){
 }
 function renderMacro(s){
   const m=s.macro;
-  const card=(k,v,p)=>`<div class="mstat"><div class="k">${k}</div><div class="v">${int(v)}</div><div class="p">${p}</div></div>`;
+  const card=(k,v,p,col)=>`<div class="mstat"><div class="k">${k}</div><div class="v" style="color:${col||'var(--ac)'}">${v}</div><div class="p">${p}</div></div>`;
   const cmp=(title,past,pres,pl,sl)=>{ const mx=Math.max(past,pres,1),up=pres>=past;
     const dl=past===0?(pres>0?'NOVO':'—'):(up?'▲ ':'▼ ')+Math.abs((pres-past)/past*100).toFixed(0)+'%';
     const col=past===0?'var(--muted)':up?'#34d399':'#f87171', bar=(v,c)=>`height:${Math.max(v/mx*100,4)}%;background:${c}`;
@@ -260,8 +268,8 @@ function renderMacro(s){
     ? `<div class="mtop3"><span class="t3lbl">🏅 Top 3 em eficiência</span>${m.topEfic.map((e,i)=>`<span class="t3i">${['🥇','🥈','🥉'][i]} <b>${e.nome.toLowerCase()}</b> <em>${e.pct.toFixed(0)}% (${int(e.call)}/${int(e.total)})</em></span>`).join('')}</div>`
     : '';
   $('#grid').innerHTML=`<div class="macro">
-    <div class="mtop">${card('Matrículas Totais Intake',m.totalIntake,'status Matriculado')}${card('Hoje',m.hoje,'data da matrícula')}${card('Esta semana',m.semana,'segunda até hoje')}${card('Este mês',m.mes,'mês de comissão (11→10)')}</div>
-    <div class="mbot">${cmp('Ontem × Hoje',m.ontem,m.hoje,'Ontem','Hoje')}${cmp('Semana passada × Esta semana',m.semanaPassada,m.semana,'Sem. passada','Esta semana (mesmo período)')}</div>
+    <div class="mtop">${card('Matrículas geradas',int(m.geradas),'intake (graduação)','var(--ac)')}${card('Pré-matriculados',int(m.pre),'a converter','#fbbf24')}${card('Matriculados',int(m.matriculado),'confirmadas','#34d399')}${card('Taxa matr. pagas',m.taxaPagas.toFixed(1)+'%',int(m.pago)+' de '+int(m.geradas),'#34d399')}${card('Boletos pendentes',int(m.pend),'vencidos + em aberto','#f87171')}</div>
+    <div class="mbot">${cmp(m.ontemLabel+' × Hoje',m.ontem,m.hoje,m.ontemLabel,'Hoje')}${cmp('Semana passada × Esta semana',m.semanaPassada,m.semana,'Sem. passada','Esta semana (mesmo período)')}</div>
     ${efic}${t3}</div>`;
 }
 function medal(i){ return i===0?'🥇':i===1?'🥈':i===2?'🥉':String(i+1); }
