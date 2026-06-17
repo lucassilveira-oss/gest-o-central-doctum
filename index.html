@@ -100,7 +100,7 @@
     <div class="uprow"><span class="lbl">🎓 Matrículas</span><input type="file" id="upMat" accept=".xls,.xlsx"></div>
     <div class="uprow"><span class="lbl">💬 Atendimentos</span><input type="file" id="upAt" accept=".xls,.xlsx"></div>
     <div class="uprow"><span class="lbl">⭐ Avaliações</span><input type="file" id="upAval" accept=".xls,.xlsx"></div>
-    <div class="uprow"><span class="lbl">📊 Comparativo</span><input type="file" id="upComp" accept=".xlsx,.xls"> <span class="hint">(anual · fica salvo)</span></div>
+    <div class="uprow"><span class="lbl">📁 Ano anterior</span><input type="file" id="upComp" accept=".xlsx,.xls"> <span class="hint">(captação fechada · sobe 1x e fica salvo)</span></div>
     <div class="lerr" id="upErr" style="text-align:left"></div>
     <div class="mfoot">
       <button class="btn ghost" id="upCancel">Cancelar</button>
@@ -148,7 +148,7 @@ async function loadReports(){
   $('#tabLig').disabled=!lig; $('#tabMat').disabled=!mat; $('#tabAt').disabled=!at;
   $('#tabCross').disabled=!(mat&&(lig||at));
   $('#tabTV').disabled=!(mat||lig||aval);
-  $('#tabComp').disabled=!comp;
+  $('#tabComp').disabled=!(comp&&mat);
   pushAll();
   const first = lig?'lig':mat?'mat':at?'at':null;
   if(first){ $('#status').style.display='none'; show(first); }
@@ -178,7 +178,7 @@ function pushTo(tab){
   try{
     if(tab==='cross') f.contentWindow.postMessage({kind:'loadCross',mat:b.mat,lig:b.lig,at:b.at,canChange:isAdmin},'*');
     else if(tab==='tv') f.contentWindow.postMessage({kind:'loadTV',mat:b.mat,lig:b.lig,aval:b.aval,updated:lastUpdMs},'*');
-    else if(tab==='comp'){ if(b.comp) f.contentWindow.postMessage({kind:'loadWorkbook',buffer:b.comp,canChange:isAdmin},'*'); }
+    else if(tab==='comp'){ f.contentWindow.postMessage({kind:'loadCompare',prev:b.comp,cur:b.mat,canChange:isAdmin},'*'); }
     else if(tab==='at'){ if(b.at) f.contentWindow.postMessage({kind:'loadWorkbook',buffer:b.at,evalBuffer:b.aval,canChange:isAdmin},'*'); }
     else { const buf = tab==='lig'?b.lig:b.mat; if(buf) f.contentWindow.postMessage({kind:'loadWorkbook',buffer:buf,canChange:isAdmin},'*'); }
   }catch(e){}
