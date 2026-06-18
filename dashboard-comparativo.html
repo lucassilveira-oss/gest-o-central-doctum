@@ -224,10 +224,12 @@ function aggCount(recs,end,keyfn){ const m={}; for(const r of recs){ if(!pass(r)
 function totalCount(recs,end){ let n=0; for(const r of recs){ if(!pass(r))continue; n+=recContrib(r,end); } return n; }
 
 function windows(){
+  // O ANO ATUAL é sempre o total captado (o relatório é o retrato de hoje) -> nunca corta.
+  // A comparação só muda o ANO ANTERIOR: período inteiro x mesma data do ano passado.
   if(align==='total') return {cur:null, prev:null, asofTxt:'período inteiro'};
   const ce=curEndDate(); if(!ce) return {cur:null,prev:null,asofTxt:'—'};
   const pe=eod(new Date(ce.getFullYear()-1, ce.getMonth(), ce.getDate()));
-  return {cur:ce, prev:pe, asofTxt:'até '+ce.toLocaleDateString('pt-BR')+' (ano anterior até '+pe.toLocaleDateString('pt-BR')+')'};
+  return {cur:null, prev:pe, asofTxt:'atual = total captado · ano anterior até '+pe.toLocaleDateString('pt-BR')};
 }
 
 function renderAll(){ renderKPIs(); renderDim(); renderHeader(); }
@@ -251,7 +253,7 @@ function renderKPIs(){
   let alta=0,queda=0; keys.forEach(k=>{ const a=ap[k]||0,b=ac[k]||0; if(b>a)alta++; else if(b<a)queda++; });
   const cards=[
     {label:String(yPrev),val:int(tp),foot:w.prev?('até '+w.prev.toLocaleDateString('pt-BR')):'período inteiro',cls:'accent'},
-    {label:String(yCur),val:int(tc),foot:w.cur?('até '+w.cur.toLocaleDateString('pt-BR')):'período inteiro',cls:'accent'},
+    {label:String(yCur),val:int(tc),foot:align==='total'?'período inteiro':'total captado até hoje',cls:'accent'},
     {label:'Diferença',val:(dif>0?'+':'')+int(dif),foot:'este ano − anterior',cls:dif>=0?'good':'bad'},
     {label:'Variação a.a',val:pctTxt(pct),foot:'vs ano anterior',cls:pct>=0?'good':'bad'},
     {label:'Unidades em alta',val:int(alta),foot:'cresceram',cls:'good'},
