@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard de Matrículas — Pós EAD</title>
+<script src="xlsx.full.min.js"></script>
+<style>
+  :root{
+    --bg:#0f172a; --panel:#1e293b; --panel2:#273549; --line:#334155;
+    --txt:#e2e8f0; --muted:#94a3b8; --accent:#38bdf8; --accent2:#818cf8;
+    --good:#34d399; --warn:#fbbf24; --bad:#f87171; --qualif:#a78bfa; --shadow:none;
+  }
+  body.light{
+    --bg:#eef2f7; --panel:#fff; --panel2:#f1f5f9; --line:#e2e8f0;
+    --txt:#0f172a; --muted:#64748b; --accent:#0284c7; --accent2:#6366f1;
+    --good:#059669; --warn:#d97706; --bad:#dc2626; --qualif:#7c3aed; --shadow:0 1px 3px rgba(15,23,42,.08);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--txt);padding:24px;line-height:1.4;transition:.2s}
+  h1{font-size:22px;font-weight:700}
+  h2{font-size:15px;font-weight:600;margin-bottom:12px;color:var(--accent);text-transform:uppercase;letter-spacing:.5px}
+  .sub{color:var(--muted);font-size:13px;margin-top:2px}
+  header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+  #drop{border:2px dashed var(--line);border-radius:14px;padding:48px;text-align:center;cursor:pointer;transition:.2s;background:var(--panel)}
+  #drop:hover,#drop.over{border-color:var(--accent);background:var(--panel2)}
+  #drop .big{font-size:18px;font-weight:600;margin-bottom:6px} #drop .ic{font-size:46px;margin-bottom:10px;opacity:.8}
+  .btn{background:var(--accent);color:#fff;border:none;padding:9px 16px;border-radius:8px;font-weight:600;cursor:pointer;font-size:13px}
+  .btn.ghost{background:transparent;color:var(--accent);border:1px solid var(--line)}
+  .grid{display:grid;gap:14px}
+  .kpis{grid-template-columns:repeat(auto-fit,minmax(165px,1fr))}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;box-shadow:var(--shadow)}
+  .kpi .label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+  .kpi .val{font-size:27px;font-weight:700;margin-top:4px}
+  .kpi .foot{font-size:12px;color:var(--muted);margin-top:4px}
+  .kpi.accent .val{color:var(--accent)} .kpi.good .val{color:var(--good)} .kpi.bad .val{color:var(--bad)}
+  .kpi.warn .val{color:var(--warn)} .kpi.qualif .val{color:var(--qualif)}
+  .twocol{grid-template-columns:1fr 1fr} @media(max-width:900px){.twocol{grid-template-columns:1fr}}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--line)}
+  th{color:var(--muted);font-weight:600;cursor:pointer;user-select:none;white-space:nowrap}
+  th:hover{color:var(--accent)}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+  tbody tr:hover{background:var(--panel2)}
+  .tablewrap{max-height:520px;overflow:auto}
+  .bar-wrap{background:var(--panel2);border-radius:5px;height:8px;overflow:hidden;min-width:50px}
+  .bar{height:100%;border-radius:5px}
+  /* séries temporais */
+  .chart{display:flex;gap:4px;align-items:flex-end;height:170px;padding-top:18px;overflow-x:auto}
+  .ccol{flex:1;min-width:26px;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%}
+  .cbar{width:62%;border-radius:3px 3px 0 0;min-height:2px;background:var(--accent)}
+  .ccount{font-size:10px;font-weight:700;margin-bottom:2px}
+  .clbl{font-size:9px;color:var(--muted);margin-top:4px;white-space:nowrap;transform:rotate(-45deg);transform-origin:center;height:34px}
+  /* evolução */
+  .evo3{grid-template-columns:repeat(3,1fr)} @media(max-width:760px){.evo3{grid-template-columns:1fr}}
+  .evo{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;align-items:center;gap:6px}
+  .evo-title{font-size:13px;font-weight:600;text-align:center;color:var(--muted)}
+  .evo-bars{display:flex;gap:20px;align-items:flex-end;height:120px}
+  .evo-col{display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;width:56px}
+  .evo-bar{width:100%;border-radius:5px 5px 0 0;min-height:3px}
+  .evo-count{font-size:16px;font-weight:700;margin-bottom:4px}
+  .evo-lbl{font-size:11px;color:var(--muted);margin-top:5px;text-align:center}
+  .evo-delta{font-size:14px;font-weight:700}
+  /* status bars */
+  .statline{margin-bottom:12px}
+  .statline .top{display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px}
+  /* filtros */
+  .filterbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px}
+  .ms{position:relative;display:inline-block}
+  .ms-btn{background:var(--panel);color:var(--txt);border:1px solid var(--line);padding:8px 28px 8px 12px;border-radius:8px;font-size:13px;cursor:pointer;position:relative;min-width:150px;text-align:left}
+  .ms-btn::after{content:'▾';position:absolute;right:10px;color:var(--muted)}
+  .ms-panel{display:none;position:absolute;z-index:50;top:calc(100% + 4px);left:0;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px;min-width:260px;max-height:340px;overflow:auto;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+  .ms.open .ms-panel{display:block}
+  .ms-search{width:100%;padding:7px 9px;margin-bottom:6px;border:1px solid var(--line);border-radius:6px;background:var(--panel2);color:var(--txt);font-size:13px}
+  .ms-panel label{display:flex;gap:8px;align-items:center;padding:5px 8px;border-radius:6px;font-size:13px;cursor:pointer}
+  .ms-panel label:hover{background:var(--panel2)}
+  .ms-panel .ms-all{border-bottom:1px solid var(--line);font-weight:600;margin-bottom:4px}
+  .secthead{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+  .secthead h2{margin-bottom:0}
+  .toggle{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .toggle button{background:var(--panel);color:var(--muted);border:none;padding:7px 14px;font-size:13px;cursor:pointer}
+  .toggle button.on{background:var(--accent);color:#fff;font-weight:600}
+  .dateinput,#dateBasis{background:var(--panel);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:7px 10px;font-size:13px}
+  .dateinput::-webkit-calendar-picker-indicator{filter:invert(.6)}
+  body.light .dateinput::-webkit-calendar-picker-indicator{filter:none}
+  #dash{display:none} .sec{margin-top:18px} .filename{font-size:13px;color:var(--muted)}
+  .hint{font-size:11px;color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0}
+  .printinfo{display:none}
+  @media print{
+    @page{ size:A4 landscape; margin:9mm; }
+    body, body.light{ --bg:#fff;--panel:#fff;--panel2:#eef2f7;--line:#cbd5e1;--txt:#0f172a;--muted:#475569;--accent:#0284c7;--good:#059669;--warn:#b45309;--bad:#dc2626;--qualif:#6d28d9;--shadow:none; }
+    body{ padding:0;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact; }
+    #drop,.filterbar,#pdfBtn,#themeBtn,#reloadBtn,#file,.ms,.toggle,.hint{ display:none !important; }
+    .printinfo{ display:block;font-size:12px;color:#475569;margin-bottom:8px; }
+    .card,.sec{ break-inside:avoid;page-break-inside:avoid; } .chart{ overflow:visible; }
+    table{font-size:10px} body{font-size:11px} h1{font-size:18px}
+    .tablewrap{max-height:none;overflow:visible}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>🎓 Dashboard de Matrículas</h1>
+    <div class="sub" id="periodo">Carregue o relatório analítico (.xlsx) para começar.</div>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center">
+    <span class="filename" id="fname"></span>
+    <button class="btn" id="pdfBtn" style="display:none" onclick="exportPDF()" title="Abre a impressão — escolha 'Salvar como PDF'">📄 Exportar PDF</button>
+    <button class="btn ghost" id="themeBtn" onclick="toggleTheme()">☀️ Modo claro</button>
+    <button class="btn ghost" id="reloadBtn" style="display:none" onclick="document.getElementById('file').click()">Trocar arquivo</button>
+    <input type="file" id="file" accept=".xlsx,.xls" style="display:none">
+  </div>
+</header>
+
+<div id="drop">
+  <div class="ic">📂</div>
+  <div class="big">Arraste o relatório de matrículas (.xlsx) aqui</div>
+  <div class="sub">ou clique para selecionar — os dados ficam só no seu computador</div>
+</div>
+
+<div id="dash">
+  <div class="filterbar card">
+    <span style="font-size:13px;color:var(--muted);font-weight:600">Filtros:</span>
+    <div class="ms" id="fMod"></div>
+    <div class="ms" id="fUni"></div>
+    <div class="ms" id="fOp"></div>
+    <div class="ms" id="fCurso"></div>
+    <label style="font-size:13px;display:inline-flex;gap:6px;align-items:center;cursor:pointer;margin-left:6px" title="Conta apenas 1 matrícula por CPF nas modalidades Pós-Graduação EAD e Cursos Livres">
+      <input type="checkbox" id="dedupCpf" checked> 1 matr./CPF <span class="hint">(Pós/Livres)</span>
+    </label>
+    <span style="font-size:13px;color:var(--muted);font-weight:600;margin-left:6px">Período por</span>
+    <select id="dateBasis" title="Filtra o período pela data escolhida. O card 'Matrículas geradas' sempre usa a Data da Matrícula.">
+      <option value="dMat">Data Matrícula</option>
+      <option value="dPre">Data Pré-matrícula</option>
+      <option value="dPag">Data Pagamento</option>
+    </select>
+    <input type="date" id="dStart" class="dateinput" title="Data inicial">
+    <span style="color:var(--muted);font-size:13px">até</span>
+    <input type="date" id="dEnd" class="dateinput" title="Data final">
+    <button class="btn ghost" id="clearDates" style="padding:6px 10px">limpar</button>
+    <span class="sub" id="filterInfo"></span>
+  </div>
+
+  <div class="printinfo" id="printinfo"></div>
+
+  <div class="grid kpis" id="kpis"></div>
+
+  <!-- Séries temporais -->
+  <div class="sec card">
+    <div class="secthead">
+      <h2>📈 Vendas por data <span class="hint">(quantidade de matrículas no período)</span></h2>
+      <div class="toggle" id="granToggle">
+        <button data-g="M" class="on">Mês</button>
+        <button data-g="W">Semana</button>
+        <button data-g="D">Dia</button>
+        <button data-g="Y">Ano</button>
+      </div>
+    </div>
+    <div style="font-weight:600;font-size:13px;margin:4px 0 2px">1) Por Data da Pré-matrícula <span class="hint" id="tPre"></span></div>
+    <div class="chart" id="chartPre"></div>
+    <div style="font-weight:600;font-size:13px;margin:14px 0 2px">2) Por Data de Pagamento <span class="hint" id="tPag"></span></div>
+    <div class="chart" id="chartPag"></div>
+    <div style="font-weight:600;font-size:13px;margin:14px 0 2px">3) Por Data do Status Matriculado <span class="hint" id="tMat"></span></div>
+    <div class="chart" id="chartMat"></div>
+  </div>
+
+  <!-- Evolução de matrículas -->
+  <div class="sec card">
+    <div class="secthead"><h2>📊 Evolução de matrículas <span class="hint">(por Data da Matrícula · comparado a hoje)</span></h2></div>
+    <div class="grid evo3" id="evolucao"></div>
+  </div>
+
+  <!-- Status -->
+  <div class="grid twocol sec">
+    <div class="card">
+      <h2>📋 Status da matrícula</h2>
+      <div id="statMat"></div>
+    </div>
+    <div class="card">
+      <h2>🧾 Status do boleto</h2>
+      <div id="statBol"></div>
+    </div>
+  </div>
+
+  <!-- Separar por dimensão -->
+  <div class="sec card">
+    <div class="secthead">
+      <h2>🔎 Separar por <span class="hint">(clique no cabeçalho para ordenar)</span></h2>
+      <div class="toggle" id="dimToggle">
+        <button data-d="modalidade" class="on">Modalidade</button>
+        <button data-d="operador">Operador</button>
+        <button data-d="unidade">Unidade</button>
+        <button data-d="curso">Curso</button>
+      </div>
+    </div>
+    <div class="tablewrap" id="dimWrap">
+      <table id="dimTable">
+        <thead><tr>
+          <th data-k="nome" id="dimColName">Dimensão</th>
+          <th class="num" data-k="total">Matrículas geradas</th>
+          <th class="num" data-k="matriculado">Matriculadas</th>
+          <th class="num" data-k="pre">Pré-matr.</th>
+          <th class="num" data-k="trancado">Trancadas</th>
+          <th class="num" data-k="pctPagas">% Pagas</th>
+          <th class="num" data-k="ticket">Ticket médio (R$)</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Ranking de operadores (filtros independentes) -->
+  <div class="sec card">
+    <div class="secthead">
+      <h2>🏆 Ranking de operadores <span class="hint">(filtros independentes · clique no cabeçalho para ordenar)</span></h2>
+    </div>
+    <div class="filterbar" style="margin-bottom:14px;border:1px dashed var(--line);padding:10px;border-radius:10px">
+      <span style="font-size:13px;color:var(--muted);font-weight:600">Filtros do ranking:</span>
+      <div class="ms" id="rkMod"></div>
+      <div class="ms" id="rkUni"></div>
+      <div class="ms" id="rkOp"></div>
+      <div class="ms" id="rkCurso"></div>
+      <label style="font-size:13px;display:inline-flex;gap:6px;align-items:center;cursor:pointer;margin-left:6px" title="Conta apenas 1 matrícula por CPF nas modalidades Pós-Graduação EAD e Cursos Livres">
+        <input type="checkbox" id="rkDedup" checked> 1 matr./CPF <span class="hint">(Pós/Livres)</span>
+      </label>
+      <span style="font-size:13px;color:var(--muted);font-weight:600;margin-left:6px">Período por</span>
+      <select id="rkBasis">
+        <option value="dMat">Data Matrícula</option>
+        <option value="dPre">Data Pré-matrícula</option>
+        <option value="dPag">Data Pagamento</option>
+      </select>
+      <input type="date" id="rkStart" class="dateinput" title="Data inicial">
+      <span style="color:var(--muted);font-size:13px">até</span>
+      <input type="date" id="rkEnd" class="dateinput" title="Data final">
+      <button class="btn ghost" id="rkClear" style="padding:6px 10px">limpar</button>
+      <span class="sub" id="rkInfo"></span>
+    </div>
+    <div class="tablewrap">
+      <table id="rankTable">
+        <thead><tr>
+          <th class="num" style="width:42px">#</th>
+          <th data-k="nome">Operador</th>
+          <th class="num" data-k="total">Matrículas geradas</th>
+          <th class="num" data-k="matriculado">Matriculadas</th>
+          <th class="num" data-k="pre">Pré-matr.</th>
+          <th class="num" data-k="trancado">Trancadas</th>
+          <th class="num" data-k="pctPagas">% Pagas</th>
+          <th class="num" data-k="ticket">Ticket médio (R$)</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="sub" id="footnote" style="margin-top:20px;text-align:center">Gerado localmente no navegador · nenhum dado é enviado para a internet.</div>
+</div>
+
+<script>
+const $=s=>document.querySelector(s);
+const norm=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();
+function parseDateBR(v){
+  if(v==null) return null;
+  if(v instanceof Date) return isNaN(v)?null:v;
+  const s=String(v).trim(); if(!s) return null;
+  let m=s.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);            // dd/mm/aaaa
+  if(m){ let y=+m[3]; if(y<100)y+=2000; return new Date(y,+m[2]-1,+m[1]); }
+  m=s.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);                    // aaaa-mm-dd
+  if(m) return new Date(+m[1],+m[2]-1,+m[3]);
+  const d=new Date(s); return isNaN(d)?null:d;
+}
+function weekStart(d){ const x=new Date(d.getFullYear(),d.getMonth(),d.getDate()); const off=(x.getDay()+6)%7; x.setDate(x.getDate()-off); return x; } // segunda-feira
+const ymd=x=>`${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`;
+function bucket(d,g){
+  if(!d) return null;
+  if(g==='Y') return ''+d.getFullYear();
+  if(g==='D') return ymd(d);
+  if(g==='W') return ymd(weekStart(d));
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+const real = n => (n||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const int = n => (n||0).toLocaleString('pt-BR');
+
+// ====== Estado ======
+let ALL=[];
+let selMod=new Set(), selUni=new Set(), selOp=new Set(), selCurso=new Set();
+let gran='M', dim='modalidade', dimSort={k:'total',dir:-1};
+let dateBasis='dMat', dateStart=null, dateEnd=null;
+let BASE=[], dedupCpf=true;
+// janela de período aplicada a uma data qualquer
+function inDate(d){ if(!dateStart&&!dateEnd) return true; if(!d) return false; if(dateStart&&d<dateStart) return false; if(dateEnd&&d>dateEnd) return false; return true; }
+function isDedupMod(m){ const x=norm(m); return x.includes('pos gradua')||x.includes('cursos livres'); }
+// representante do CPF: prioriza pago > status (matriculado>pré>trancado) > matrícula mais recente
+function scoreRep(x){ const sr=(x.nsMat.includes('matriculado')&&!x.nsMat.includes('pre'))?3:x.nsMat.includes('pre')?2:x.nsMat.includes('tranc')?1:0;
+  return (x.valor>0?1:0)*1e15 + sr*1e13 + (x.dMat?x.dMat.getTime():0); }
+function dedupeByCpf(arr){
+  const keep=[], byCpf={};
+  for(const x of arr){
+    if(isDedupMod(x.mod) && x.cpf){ const p=byCpf[x.cpf]; if(!p||scoreRep(x)>scoreRep(p)) byCpf[x.cpf]=x; }
+    else keep.push(x);
+  }
+  return keep.concat(Object.values(byCpf));
+}
+function computeBase(){ BASE = dedupCpf ? dedupeByCpf(ALL) : ALL; }
+
+// ===== Ranking de operadores — filtros independentes do topo =====
+let rkMod=new Set(), rkUni=new Set(), rkOp=new Set(), rkCurso=new Set();
+let rkBasis='dMat', rkStart=null, rkEnd=null, rkDedup=true, RKBASE=[], rankSort={k:'total',dir:-1};
+function computeRkBase(){ RKBASE = rkDedup ? dedupeByCpf(ALL) : ALL; }
+function rkInRange(x){ if(!rkStart&&!rkEnd) return true; const d=x[rkBasis]; if(!d) return false;
+  if(rkStart&&d<rkStart) return false; if(rkEnd&&d>rkEnd) return false; return true; }
+function fRankData(){ return RKBASE.filter(x=>rkMod.has(x.mod)&&rkUni.has(x.uni)&&rkOp.has(x.op)&&rkCurso.has(x.curso)&&rkInRange(x)); }
+function parseInputDate(v){ const m=String(v).match(/(\d{4})-(\d{2})-(\d{2})/); return m?new Date(+m[1],+m[2]-1,+m[3]):null; }
+function inRange(x){ return inDate(x[dateBasis]); } // filtra pela base de data escolhida
+
+// ====== Tema ======
+function setThemeLabel(){ $('#themeBtn').textContent=document.body.classList.contains('light')?'🌙 Modo escuro':'☀️ Modo claro'; }
+function toggleTheme(){ document.body.classList.toggle('light'); try{localStorage.setItem('dash_theme',document.body.classList.contains('light')?'light':'dark');}catch(e){} setThemeLabel(); afterThemeRender(); }
+(function(){ let t='dark'; try{t=localStorage.getItem('dash_theme')||'dark';}catch(e){} if(t==='light')document.body.classList.add('light'); setThemeLabel(); })();
+function afterThemeRender(){ if(ALL.length) renderAll(); }
+
+// ====== Multiselect com busca ======
+function buildMultiSelect(sel,label,options,selected,onChange){
+  const el=$(sel); el.classList.add('ms');
+  const esc=s=>String(s).replace(/"/g,'&quot;');
+  el.innerHTML='<button class="ms-btn" type="button"></button><div class="ms-panel"><input class="ms-search" placeholder="Buscar..."><label class="ms-all"><input type="checkbox"> (Todos)</label><div class="ms-items"></div></div>';
+  const btn=el.querySelector('.ms-btn'), panel=el.querySelector('.ms-panel'),
+        search=el.querySelector('.ms-search'), allCb=el.querySelector('.ms-all input'), items=el.querySelector('.ms-items');
+  function labelTxt(){ if(selected.size>=options.length)return label+': Todos'; if(selected.size===0)return label+': Nenhum'; return label+': '+selected.size+'/'+options.length; }
+  function syncHead(){ btn.textContent=labelTxt(); allCb.checked=selected.size>=options.length; }
+  items.innerHTML=options.map(o=>'<label data-v="'+esc(o)+'"><input type="checkbox" '+(selected.has(o)?'checked':'')+'> '+o+'</label>').join('');
+  syncHead();
+  items.querySelectorAll('label input').forEach((inp,i)=>{
+    inp.onchange=()=>{ const v=options[i]; inp.checked?selected.add(v):selected.delete(v); syncHead(); onChange(); };
+  });
+  allCb.onchange=()=>{ selected.clear(); if(allCb.checked) options.forEach(o=>selected.add(o));
+    items.querySelectorAll('label input').forEach(c=>c.checked=allCb.checked); syncHead(); onChange(); };
+  search.oninput=()=>{ const q=norm(search.value); items.querySelectorAll('label').forEach(l=>{ l.style.display=norm(l.dataset.v).includes(q)?'flex':'none'; }); };
+  btn.onclick=e=>{ e.stopPropagation(); const open=el.classList.contains('open'); document.querySelectorAll('.ms.open').forEach(x=>x.classList.remove('open')); if(!open){el.classList.add('open');search.focus();} };
+  panel.onclick=e=>e.stopPropagation();
+}
+document.addEventListener('click',()=>document.querySelectorAll('.ms.open').forEach(e=>e.classList.remove('open')));
+
+// ====== Leitura ======
+function processWorkbook(wb){
+  const ws=wb.Sheets[wb.SheetNames[0]];
+  const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,defval:null});
+  const rowsRaw=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
+  let hi=rows.findIndex(r=>r&&r.some(c=>norm(c)==='nome')&&r.some(c=>norm(c).includes('modalidade')));
+  if(hi<0) hi=0;
+  const head=rows[hi].map(norm);
+  const find=(...alts)=>{ for(const a of alts){ const i=head.findIndex(h=>h===a); if(i>=0)return i; } for(const a of alts){ const i=head.findIndex(h=>h.includes(a)); if(i>=0)return i; } return -1; };
+  const ci={
+    mod:find('modalidade'), uni:find('unidade'), curso:find('curso'), op:find('operador da matricula','operador'),
+    nome:find('nome'), cpf:find('cpf'), valor:find('valor pago matricula','valor pago'), emit:find('valor emitido matricula','valor emitido'),
+    sMat:find('status da matricula'), sBol:find('status do boleto'),
+    dPre:find('data da pre matricula'), dPag:find('data pagamento','data do pagamento'), dMat:find('data da matricula'),
+  };
+  const numOf=v=>{ if(v==null)return 0; if(typeof v==='number')return v; const s=String(v).replace(/[^\d,.-]/g,'').replace(/\.(?=\d{3}(\D|$))/g,'').replace(',','.'); return parseFloat(s)||0; };
+  ALL=rows.slice(hi+1).map((r,i)=>({r,raw:rowsRaw[hi+1+i]||[]})).filter(o=>o.r&&o.r[ci.nome]&&String(o.r[ci.nome]).trim()!=='').map(({r,raw})=>{
+    const sm=String(r[ci.sMat]||'').trim(), sb=String(r[ci.sBol]||'').trim();
+    const mod=String(r[ci.mod]||'(sem modalidade)').trim();
+    const vPago = ci.valor>=0 ? numOf(raw[ci.valor]!=null?raw[ci.valor]:r[ci.valor]) : 0;
+    const vEmit = ci.emit>=0 ? numOf(raw[ci.emit]!=null?raw[ci.emit]:r[ci.emit]) : 0;
+    // Ticket médio: Pós-graduação EaD usa Valor Emitido; demais usam Valor Pago
+    const vTicket = norm(mod).includes('pos gradua') ? vEmit : vPago;
+    return {
+      mod,
+      uni:String(r[ci.uni]||'(sem unidade)').trim(),
+      curso:String(r[ci.curso]||'(sem curso)').trim(),
+      op:String(r[ci.op]||'(sem operador)').trim(),
+      cpf: ci.cpf>=0 ? String(r[ci.cpf]||'').replace(/\D/g,'') : '',
+      sMat:sm, sBol:sb, nsMat:norm(sm), nsBol:norm(sb),
+      dPre:parseDateBR(r[ci.dPre]), dPag:parseDateBR(r[ci.dPag]), dMat:parseDateBR(r[ci.dMat]),
+      valor: vPago, vTicket,
+    };
+  });
+  const uniq=k=>[...new Set(ALL.map(x=>x[k]))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
+  const mods=uniq('mod'), unis=uniq('uni'), ops=uniq('op'), cursos=uniq('curso');
+  selMod=new Set(mods); selUni=new Set(unis); selOp=new Set(ops); selCurso=new Set(cursos);
+  buildMultiSelect('#fMod','Modalidade',mods,selMod,renderAll);
+  buildMultiSelect('#fUni','Unidade',unis,selUni,renderAll);
+  buildMultiSelect('#fOp','Operador',ops,selOp,renderAll);
+  buildMultiSelect('#fCurso','Curso',cursos,selCurso,renderAll);
+  // filtros independentes do ranking
+  rkMod=new Set(mods); rkUni=new Set(unis); rkOp=new Set(ops); rkCurso=new Set(cursos);
+  buildMultiSelect('#rkMod','Modalidade',mods,rkMod,renderRanking);
+  buildMultiSelect('#rkUni','Unidade',unis,rkUni,renderRanking);
+  buildMultiSelect('#rkOp','Operador',ops,rkOp,renderRanking);
+  buildMultiSelect('#rkCurso','Curso',cursos,rkCurso,renderRanking);
+  computeBase(); computeRkBase();
+  $('#drop').style.display='none'; $('#dash').style.display='block';
+  $('#reloadBtn').style.display='inline-block'; $('#pdfBtn').style.display='inline-block';
+  renderAll();
+}
+
+function fDataNoDate(){ return BASE.filter(x=>selMod.has(x.mod)&&selUni.has(x.uni)&&selOp.has(x.op)&&selCurso.has(x.curso)); }
+function fData(){ return fDataNoDate().filter(inRange); }
+
+function renderAll(){ renderHeader(); renderKPIs(); renderCharts(); renderEvolucao(); renderStatus(); renderDim(); renderRanking(); }
+
+function renderHeader(){
+  const d=fData();
+  const dts=d.map(x=>x.dMat).filter(Boolean);
+  let txt=`${int(d.length)} matrículas`;
+  if(dts.length){ const min=new Date(Math.min(...dts)),max=new Date(Math.max(...dts));
+    const f=x=>x.toLocaleDateString('pt-BR'); txt=`Matrículas de ${f(min)} a ${f(max)} · ${int(d.length)} registros`; }
+  $('#periodo').textContent=txt;
+  $('#filterInfo').textContent = d.length<BASE.length ? `(filtrado: ${int(d.length)} de ${int(BASE.length)})` : '';
+  const lbl=(set,all,nome)=> set.size<all?[...set].slice(0,3).join(', ')+(set.size>3?` +${set.size-3}`:''):'Todas';
+  document.title='Dashboard de Matrículas';
+  const emit=new Date().toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  const u=k=>[...new Set(ALL.map(x=>x[k]))].length;
+  const baseNome={dMat:'Data Matrícula',dPre:'Data Pré-matrícula',dPag:'Data Pagamento'}[dateBasis];
+  const fd=x=>x?x.toLocaleDateString('pt-BR'):'';
+  const periodoLinha=(dateStart||dateEnd)?` · Período (${baseNome}): ${fd(dateStart)||'início'} até ${fd(dateEnd)||'hoje'}`:'';
+  const dedupTxt = dedupCpf ? ' · Contagem: 1 matrícula por CPF (Pós/Livres)' : '';
+  $('#printinfo').innerHTML=`<b>${txt}</b>${periodoLinha}<br>Modalidade: ${lbl(selMod,u('mod'))} · Unidade: ${lbl(selUni,u('uni'))} · Operador: ${lbl(selOp,u('op'))} · Curso: ${lbl(selCurso,u('curso'))}${dedupTxt} · Emitido em ${emit}`;
+}
+
+function renderKPIs(){
+  const d=fData(), n=d.length;
+  const mat=d.filter(x=>x.nsMat.includes('matriculado')&&!x.nsMat.includes('pre')).length;
+  const pre=d.filter(x=>x.nsMat.includes('pre')).length;
+  const tra=d.filter(x=>x.nsMat.includes('tranc')).length;
+  const pago=d.filter(x=>x.nsBol==='pago').length;
+  const pend=d.filter(x=>x.nsBol.includes('venc')||x.nsBol.includes('aberto')).length;
+  const dTk=d.filter(x=>!norm(x.curso).includes('medicina'));  // ticket médio desconsidera o curso de Medicina
+  const valor=dTk.reduce((s,x)=>s+x.vTicket,0);
+  const pagantes=dTk.filter(x=>x.vTicket>0).length;
+  // "Matrículas geradas" SEMPRE pela Data da Pré-matrícula (independe da base de data escolhida)
+  const geradas=fDataNoDate().filter(x=>inDate(x.dPre)).length;
+  const pct=v=>n?(v/n*100).toFixed(1):0;
+  const cards=[
+    {label:'Matrículas geradas',val:int(geradas),foot:'sempre por Data da Pré-matrícula',cls:'accent'},
+    {label:'Matriculados',val:int(mat),foot:pct(mat)+'%',cls:'good'},
+    {label:'Pré-matriculados',val:int(pre),foot:pct(pre)+'% · a converter',cls:'warn'},
+    {label:'Trancados',val:int(tra),foot:pct(tra)+'%',cls:'bad'},
+    {label:'Taxa de matr. pagas',val:pct(pago)+'%',foot:`${int(pago)} de ${int(n)} pagas`,cls:'good'},
+    {label:'Boletos pendentes',val:int(pend),foot:'vencidos + em aberto',cls:'bad'},
+    {label:'Ticket médio (R$)',val:real(pagantes?valor/pagantes:0),foot:`${int(pagantes)} no cálculo`,cls:'accent'},
+  ];
+  $('#kpis').innerHTML=cards.map(c=>`<div class="card kpi ${c.cls}"><div class="label">${c.label}</div><div class="val">${c.val}</div><div class="foot">${c.foot}</div></div>`).join('');
+}
+
+function drawChart(elId,key,totId,color){
+  // cada gráfico usa sua PRÓPRIA data e respeita a janela de datas no seu próprio eixo
+  const src=fDataNoDate(), b={};
+  for(const x of src){ const dd=x[key]; if(!dd) continue;
+    if(dateStart&&dd<dateStart) continue; if(dateEnd&&dd>dateEnd) continue;
+    const k=bucket(dd,gran); if(k) b[k]=(b[k]||0)+1; }
+  const keys=Object.keys(b).sort();
+  const total=keys.reduce((s,k)=>s+b[k],0);
+  $(totId).textContent = `— ${int(total)} com data preenchida`;
+  const max=Math.max(...keys.map(k=>b[k]),1);
+  $(elId).innerHTML = keys.length? keys.map(k=>{
+    const lbl = gran==='M'? k.slice(5,7)+'/'+k.slice(2,4)
+      : (gran==='D'||gran==='W')? k.slice(8,10)+'/'+k.slice(5,7)
+      : k;
+    const tip = gran==='W'? `Semana de ${k.slice(8,10)}/${k.slice(5,7)}: ${b[k]}` : `${k}: ${b[k]}`;
+    return `<div class="ccol" title="${tip}"><div class="ccount">${b[k]}</div><div class="cbar" style="height:${b[k]/max*100}%;background:${color}"></div><div class="clbl">${lbl}</div></div>`;
+  }).join('') : '<div class="sub">Sem datas preenchidas neste recorte.</div>';
+}
+function renderCharts(){
+  drawChart('#chartPre','dPre','#tPre','var(--accent)');   // azul (atual)
+  drawChart('#chartPag','dPag','#tPag','#1d4ed8');         // azul mais escuro
+  drawChart('#chartMat','dMat','#tMat','var(--good)');     // verde (status matriculado)
+}
+
+function renderEvolucao(){
+  const datas=fDataNoDate().map(x=>x.dMat).filter(Boolean);
+  const now=new Date(), t=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  const yest=new Date(t); yest.setDate(t.getDate()-1);
+  const sameDay=ref=>datas.filter(x=>x.getFullYear()===ref.getFullYear()&&x.getMonth()===ref.getMonth()&&x.getDate()===ref.getDate()).length;
+  const eod=x=>{ const d=new Date(x); d.setHours(23,59,59,999); return d; };
+  const inRangeC=(a,b)=>datas.filter(x=>x>=a&&x<=b).length;
+  // Semana: mesmo período decorrido — segunda→hoje vs segunda→mesmo dia da semana passada
+  const tws=weekStart(t), twe=eod(t);
+  const lws=new Date(tws); lws.setDate(tws.getDate()-7);
+  const lwe=eod(new Date(t.getFullYear(),t.getMonth(),t.getDate()-7));
+  // Mês: data com data — dia 1→hoje vs dia 1→mesmo dia do mês passado
+  const dd=t.getDate();
+  const tmStart=new Date(t.getFullYear(),t.getMonth(),1), tmEnd=eod(t);
+  const lmDays=new Date(t.getFullYear(),t.getMonth(),0).getDate();
+  const lmStart=new Date(t.getFullYear(),t.getMonth()-1,1);
+  const lmEnd=eod(new Date(t.getFullYear(),t.getMonth()-1,Math.min(dd,lmDays)));
+  const blocks=[
+    {title:'Ontem × Hoje', pl:'Ontem', sl:'Hoje', past:sameDay(yest), pres:sameDay(t)},
+    {title:'Semana passada × Essa semana', pl:'Sem. passada', sl:'Essa semana', past:inRangeC(lws,lwe), pres:inRangeC(tws,twe)},
+    {title:'Mês passado × Esse mês', pl:'Mês passado', sl:'Esse mês', past:inRangeC(lmStart,lmEnd), pres:inRangeC(tmStart,tmEnd)},
+  ];
+  $('#evolucao').innerHTML=blocks.map(b=>{
+    const max=Math.max(b.past,b.pres,1), up=b.pres>=b.past;
+    const delta = b.past===0 ? (b.pres>0?'novo':'—') : (up?'▲ ':'▼ ')+Math.abs((b.pres-b.past)/b.past*100).toFixed(0)+'%';
+    const col = b.past===0?'var(--muted)':(up?'var(--good)':'var(--bad)');
+    return `<div class="evo">
+      <div class="evo-title">${b.title}</div>
+      <div class="evo-bars">
+        <div class="evo-col"><div class="evo-count">${int(b.past)}</div><div class="evo-bar" style="height:${b.past/max*100}%;background:var(--muted)"></div><div class="evo-lbl">${b.pl}</div></div>
+        <div class="evo-col"><div class="evo-count">${int(b.pres)}</div><div class="evo-bar" style="height:${b.pres/max*100}%;background:var(--good)"></div><div class="evo-lbl">${b.sl}</div></div>
+      </div>
+      <div class="evo-delta" style="color:${col}">${delta}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderStatusBlock(elId,keyN,colorMap){
+  const d=fData(), n=d.length||1, c={};
+  for(const x of d){ const k=x[keyN]||'(vazio)'; c[k]=(c[k]||0)+1; }
+  const rows=Object.entries(c).sort((a,b)=>b[1]-a[1]);
+  const max=Math.max(...rows.map(r=>r[1]),1);
+  $(elId).innerHTML=rows.map(([k,v])=>{
+    const col=colorMap(norm(k));
+    return `<div class="statline"><div class="top"><span>${k}</span><span style="color:var(--muted)">${int(v)} · ${(v/n*100).toFixed(1)}%</span></div><div class="bar-wrap" style="height:10px"><div class="bar" style="width:${v/max*100}%;background:${col}"></div></div></div>`;
+  }).join('')+`<div class="sub" style="margin-top:6px">Base: ${int(d.length)} matrículas.</div>`;
+}
+function renderStatus(){
+  renderStatusBlock('#statMat','sMat',k=> k.includes('matriculado')&&!k.includes('pre')?'var(--good)': k.includes('pre')?'var(--warn)':'var(--bad)');
+  renderStatusBlock('#statBol','sBol',k=> k==='pago'?'var(--good)': k.includes('gerado')?'var(--muted)': k.includes('venc')?'var(--bad)':'var(--warn)');
+}
+
+function renderDim(){
+  const d=fData(), m={};
+  for(const x of d){
+    const key=x[dim]||'(vazio)';
+    const a=m[key]||(m[key]={nome:key,total:0,matriculado:0,pre:0,trancado:0,pago:0,valor:0,pagantes:0});
+    a.total++;
+    if(x.nsMat.includes('matriculado')&&!x.nsMat.includes('pre'))a.matriculado++;
+    if(x.nsMat.includes('pre'))a.pre++;
+    if(x.nsMat.includes('tranc'))a.trancado++;
+    if(x.nsBol==='pago')a.pago++;
+    if(x.vTicket>0){ a.valor+=x.vTicket; a.pagantes++; }
+  }
+  let rows=Object.values(m).map(a=>({...a,
+    pctPagas:a.total?a.pago/a.total*100:0,
+    ticket:a.pagantes?a.valor/a.pagantes:0}));
+  const k=dimSort.k,dir=dimSort.dir;
+  rows.sort((a,b)=>typeof a[k]==='string'?a[k].localeCompare(b[k],'pt-BR')*dir:(a[k]-b[k])*dir);
+  const maxTot=Math.max(...rows.map(r=>r.total),1);
+  $('#dimColName').textContent = {modalidade:'Modalidade',operador:'Operador',unidade:'Unidade',curso:'Curso'}[dim];
+  const T={total:0,matriculado:0,pre:0,trancado:0,pago:0,valor:0,pagantes:0};
+  rows.forEach(r=>{T.total+=r.total;T.matriculado+=r.matriculado;T.pre+=r.pre;T.trancado+=r.trancado;T.pago+=r.pago;T.valor+=r.valor;T.pagantes+=r.pagantes;});
+  $('#dimTable tbody').innerHTML=rows.map(r=>`<tr>
+    <td>${r.nome}</td>
+    <td class="num"><div style="display:flex;align-items:center;gap:8px;justify-content:flex-end"><span>${int(r.total)}</span><div class="bar-wrap" style="width:46px"><div class="bar" style="width:${r.total/maxTot*100}%;background:var(--accent)"></div></div></div></td>
+    <td class="num" style="color:var(--good)">${int(r.matriculado)}</td>
+    <td class="num" style="color:var(--warn)">${int(r.pre)}</td>
+    <td class="num">${int(r.trancado)}</td>
+    <td class="num">${r.pctPagas.toFixed(1)}%</td>
+    <td class="num">${real(r.ticket)}</td>
+  </tr>`).join('') + `<tr style="font-weight:700;border-top:2px solid var(--line)">
+    <td>TOTAL (${int(rows.length)})</td>
+    <td class="num">${int(T.total)}</td>
+    <td class="num">${int(T.matriculado)}</td>
+    <td class="num">${int(T.pre)}</td>
+    <td class="num">${int(T.trancado)}</td>
+    <td class="num">${(T.total?T.pago/T.total*100:0).toFixed(1)}%</td>
+    <td class="num">${real(T.pagantes?T.valor/T.pagantes:0)}</td>
+  </tr>`;
+}
+
+function renderRanking(){
+  const d=fRankData(), m={};
+  for(const x of d){
+    const key=x.op||'(sem operador)';
+    const a=m[key]||(m[key]={nome:key,total:0,matriculado:0,pre:0,trancado:0,pago:0,valor:0,pagantes:0});
+    a.total++;
+    if(x.nsMat.includes('matriculado')&&!x.nsMat.includes('pre'))a.matriculado++;
+    if(x.nsMat.includes('pre'))a.pre++;
+    if(x.nsMat.includes('tranc'))a.trancado++;
+    if(x.nsBol==='pago')a.pago++;
+    if(x.vTicket>0){ a.valor+=x.vTicket; a.pagantes++; }
+  }
+  let rows=Object.values(m).map(a=>({...a,pctPagas:a.total?a.pago/a.total*100:0,ticket:a.pagantes?a.valor/a.pagantes:0}));
+  const k=rankSort.k,dir=rankSort.dir;
+  rows.sort((a,b)=>typeof a[k]==='string'?a[k].localeCompare(b[k],'pt-BR')*dir:(a[k]-b[k])*dir);
+  $('#rkInfo').textContent = `${int(rows.length)} operadores · ${int(d.length)} matrículas`;
+  const maxTot=Math.max(...rows.map(r=>r.total),1);
+  $('#rankTable tbody').innerHTML=rows.map((r,i)=>`<tr>
+    <td class="num" style="color:var(--muted);font-weight:700">${i+1}</td>
+    <td>${r.nome}</td>
+    <td class="num"><div style="display:flex;align-items:center;gap:8px;justify-content:flex-end"><span>${int(r.total)}</span><div class="bar-wrap" style="width:46px"><div class="bar" style="width:${r.total/maxTot*100}%;background:var(--accent)"></div></div></div></td>
+    <td class="num" style="color:var(--good)">${int(r.matriculado)}</td>
+    <td class="num" style="color:var(--warn)">${int(r.pre)}</td>
+    <td class="num">${int(r.trancado)}</td>
+    <td class="num">${r.pctPagas.toFixed(1)}%</td>
+    <td class="num">${real(r.ticket)}</td>
+  </tr>`).join('') || '<tr><td colspan="8" class="sub">Nenhum operador no recorte selecionado.</td></tr>';
+}
+
+// ====== Controles ======
+$('#granToggle').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return;
+  gran=b.dataset.g; $('#granToggle').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); renderCharts(); });
+$('#dimToggle').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return;
+  dim=b.dataset.d; dimSort={k:'total',dir:-1}; $('#dimToggle').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); renderDim(); });
+document.querySelectorAll('#dimTable th').forEach(th=>th.addEventListener('click',()=>{ const k=th.dataset.k; if(!k)return;
+  if(dimSort.k===k)dimSort.dir*=-1; else{dimSort.k=k;dimSort.dir=k==='nome'?1:-1;} renderDim(); }));
+$('#dateBasis').onchange=e=>{ dateBasis=e.target.value; if(dateStart||dateEnd) renderAll(); };
+$('#dStart').onchange=e=>{ dateStart=parseInputDate(e.target.value); renderAll(); };
+$('#dEnd').onchange=e=>{ dateEnd=parseInputDate(e.target.value); renderAll(); };
+$('#clearDates').onclick=()=>{ dateStart=dateEnd=null; $('#dStart').value=''; $('#dEnd').value=''; renderAll(); };
+$('#dedupCpf').onchange=e=>{ dedupCpf=e.target.checked; computeBase(); renderAll(); };
+// controles do ranking (independentes)
+$('#rkBasis').onchange=e=>{ rkBasis=e.target.value; if(rkStart||rkEnd) renderRanking(); };
+$('#rkStart').onchange=e=>{ rkStart=parseInputDate(e.target.value); renderRanking(); };
+$('#rkEnd').onchange=e=>{ rkEnd=parseInputDate(e.target.value); renderRanking(); };
+$('#rkClear').onclick=()=>{ rkStart=rkEnd=null; $('#rkStart').value=''; $('#rkEnd').value=''; renderRanking(); };
+$('#rkDedup').onchange=e=>{ rkDedup=e.target.checked; computeRkBase(); renderRanking(); };
+document.querySelectorAll('#rankTable th').forEach(th=>th.addEventListener('click',()=>{ const k=th.dataset.k; if(!k)return;
+  if(rankSort.k===k)rankSort.dir*=-1; else{rankSort.k=k;rankSort.dir=k==='nome'?1:-1;} renderRanking(); }));
+
+// ====== Arquivo ======
+function exportPDF(){ document.querySelectorAll('.ms.open').forEach(e=>e.classList.remove('open')); window.print(); }
+function handleFile(file){
+  $('#fname').textContent=file.name; $('#periodo').textContent='Lendo arquivo...';
+  const fr=new FileReader();
+  fr.onload=e=>{ try{ processWorkbook(XLSX.read(e.target.result,{type:'array'})); }
+    catch(err){ alert('Não consegui ler o arquivo.\n\n'+err.message); $('#periodo').textContent='Falha na leitura.'; } };
+  fr.readAsArrayBuffer(file);
+}
+// permite que o painel de gestão envie a planilha por mensagem (uso embutido em iframe)
+window.addEventListener('message',function(ev){ var d=ev.data||{}; if(d&&d.kind==='loadWorkbook'&&d.buffer){
+  try{ processWorkbook(XLSX.read(d.buffer,{type:'array'})); }catch(err){ alert('Erro ao processar a planilha de matrículas: '+err.message); }
+  if(d.canChange===false){ var rb=document.getElementById('reloadBtn'); if(rb)rb.style.display='none'; } } });
+const drop=$('#drop');
+drop.onclick=()=>$('#file').click();
+$('#file').onchange=e=>{ if(e.target.files[0]) handleFile(e.target.files[0]); };
+['dragover','dragenter'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over');}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over');}));
+drop.addEventListener('drop',e=>{ const f=e.dataTransfer.files[0]; if(f) handleFile(f); });
+</script>
+</body>
+</html>

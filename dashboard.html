@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard de Ligações — Call Center</title>
+<script src="xlsx.full.min.js"></script>
+<style>
+  :root{
+    --bg:#0f172a; --panel:#1e293b; --panel2:#273549; --line:#334155;
+    --txt:#e2e8f0; --muted:#94a3b8; --accent:#38bdf8; --accent2:#818cf8;
+    --good:#34d399; --warn:#fbbf24; --bad:#f87171; --qualif:#a78bfa;
+    --shadow:none;
+  }
+  body.light{
+    --bg:#eef2f7; --panel:#ffffff; --panel2:#f1f5f9; --line:#e2e8f0;
+    --txt:#0f172a; --muted:#64748b; --accent:#0284c7; --accent2:#6366f1;
+    --good:#059669; --warn:#d97706; --bad:#dc2626; --qualif:#7c3aed;
+    --shadow:0 1px 3px rgba(15,23,42,.08);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--txt);padding:24px;line-height:1.4;transition:background .2s,color .2s}
+  h1{font-size:22px;font-weight:700}
+  h2{font-size:15px;font-weight:600;margin-bottom:12px;color:var(--accent);text-transform:uppercase;letter-spacing:.5px}
+  .sub{color:var(--muted);font-size:13px;margin-top:2px}
+  header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+  #drop{border:2px dashed var(--line);border-radius:14px;padding:48px;text-align:center;cursor:pointer;transition:.2s;background:var(--panel)}
+  #drop:hover,#drop.over{border-color:var(--accent);background:var(--panel2)}
+  #drop .big{font-size:18px;font-weight:600;margin-bottom:6px}
+  #drop .ic{font-size:46px;margin-bottom:10px;opacity:.8}
+  .btn{background:var(--accent);color:#fff;border:none;padding:9px 16px;border-radius:8px;font-weight:600;cursor:pointer;font-size:13px}
+  .btn.ghost{background:transparent;color:var(--accent);border:1px solid var(--line)}
+  .grid{display:grid;gap:14px}
+  .kpis{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;box-shadow:var(--shadow)}
+  .kpi .label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+  .kpi .val{font-size:30px;font-weight:700;margin-top:4px}
+  .kpi .foot{font-size:12px;color:var(--muted);margin-top:4px}
+  .kpi.accent .val{color:var(--accent)} .kpi.good .val{color:var(--good)}
+  .kpi.bad .val{color:var(--bad)} .kpi.warn .val{color:var(--warn)}
+  .kpi.qualif .val{color:var(--qualif)}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{padding:9px 10px;text-align:left;border-bottom:1px solid var(--line)}
+  th{color:var(--muted);font-weight:600;cursor:pointer;user-select:none;white-space:nowrap}
+  th:hover{color:var(--accent)}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+  tbody tr:hover{background:var(--panel2)}
+  .bar-wrap{background:var(--panel2);border-radius:5px;height:8px;overflow:hidden;min-width:60px}
+  .bar{height:100%;border-radius:5px}
+  .pill{display:inline-block;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600}
+  .pill.g{background:rgba(52,211,153,.15);color:var(--good)}
+  .pill.w{background:rgba(251,191,36,.15);color:var(--warn)}
+  .pill.b{background:rgba(248,113,113,.15);color:var(--bad)}
+  .alert{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:10px;margin-bottom:10px;font-size:13px}
+  .alert.bad{background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3)}
+  .alert.warn{background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.3)}
+  .alert.good{background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.3)}
+  .alert .ai{font-size:18px}
+  .hours{display:flex;gap:6px;align-items:flex-end;height:190px;padding-top:10px;overflow-x:auto}
+  .hcol{flex:1;min-width:34px;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:3px;height:100%}
+  .hbars{width:100%;display:flex;gap:2px;align-items:flex-end;justify-content:center;height:100%}
+  .hbar{width:42%;border-radius:3px 3px 0 0;min-height:2px;position:relative}
+  .hcount{font-size:11px;font-weight:700;color:var(--txt)}
+  .hlbl{font-size:10px;color:var(--muted);margin-top:4px}
+  .legend{display:flex;gap:16px;font-size:12px;color:var(--muted);margin-bottom:8px;flex-wrap:wrap}
+  .legend span{display:inline-flex;align-items:center;gap:5px}
+  .dot{width:10px;height:10px;border-radius:3px;display:inline-block}
+  #dash{display:none}
+  .sec{margin-top:18px}
+  .filename{font-size:13px;color:var(--muted)}
+  .hint{font-size:11px;color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0}
+  /* filtros */
+  .filterbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:16px}
+  .dateinput{background:var(--panel);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:7px 10px;font-size:13px}
+  .dateinput::-webkit-calendar-picker-indicator{filter:invert(.6)} body.light .dateinput::-webkit-calendar-picker-indicator{filter:none}
+  .ms{position:relative;display:inline-block}
+  .ms-btn{background:var(--panel);color:var(--txt);border:1px solid var(--line);padding:8px 30px 8px 12px;border-radius:8px;font-size:13px;cursor:pointer;position:relative;min-width:160px;text-align:left}
+  .ms-btn::after{content:'▾';position:absolute;right:10px;color:var(--muted)}
+  .ms-panel{display:none;position:absolute;z-index:50;top:calc(100% + 4px);left:0;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px;min-width:230px;max-height:280px;overflow:auto;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+  .ms.open .ms-panel{display:block}
+  .ms-panel label{display:flex;gap:8px;align-items:center;padding:6px 8px;border-radius:6px;font-size:13px;cursor:pointer;white-space:nowrap}
+  .ms-panel label:hover{background:var(--panel2)}
+  .ms-panel .ms-all{border-bottom:1px solid var(--line);font-weight:600;margin-bottom:4px}
+  .secthead{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+  .secthead h2{margin-bottom:0}
+  .printinfo{display:none}
+  /* ====== Impressão / PDF ====== */
+  @media print{
+    @page{ size:A4 landscape; margin:10mm; }
+    /* força paleta clara na impressão, independente do tema da tela */
+    body, body.light{
+      --bg:#fff; --panel:#fff; --panel2:#eef2f7; --line:#cbd5e1;
+      --txt:#0f172a; --muted:#475569; --accent:#0284c7;
+      --good:#059669; --warn:#b45309; --bad:#dc2626; --qualif:#6d28d9; --shadow:none;
+    }
+    body{ padding:0; background:#fff; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    #drop, .filterbar, #pdfBtn, #themeBtn, #reloadBtn, #file, .ms, .ms-btn::after, .hint,
+    #redialSection, #footnote{ display:none !important; }
+    header{ margin-bottom:6px; }
+    .printinfo{ display:block; font-size:12px; color:#475569; margin-bottom:8px; }
+    .card{ border:1px solid #cbd5e1; break-inside:avoid; page-break-inside:avoid; }
+    .sec, .kpi{ break-inside:avoid; }
+    .hours{ overflow:visible; }
+    .kpis{ grid-template-columns:repeat(7,1fr); }
+    .kpi .val{ font-size:20px; }
+    table{ font-size:10.5px; } body{ font-size:11px; }
+    h1{ font-size:18px; }
+  }
+</style>
+</head>
+<body class="">
+
+<header>
+  <div>
+    <h1>📞 Dashboard de Ligações</h1>
+    <div class="sub" id="periodo">Carregue o relatório extraído do sistema para começar.</div>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center">
+    <span class="filename" id="fname"></span>
+    <button class="btn" id="pdfBtn" style="display:none" onclick="exportPDF()" title="Abre a janela de impressão — escolha 'Salvar como PDF'">📄 Exportar PDF</button>
+    <button class="btn ghost" id="themeBtn" onclick="toggleTheme()">🌙 Escuro</button>
+    <button class="btn ghost" id="reloadBtn" style="display:none" onclick="document.getElementById('file').click()">Trocar arquivo</button>
+    <input type="file" id="file" accept=".xlsx,.xls" style="display:none">
+  </div>
+</header>
+
+<div id="drop">
+  <div class="ic">📂</div>
+  <div class="big">Arraste o relatório (.xlsx) aqui</div>
+  <div class="sub">ou clique para selecionar — os dados ficam só no seu computador</div>
+</div>
+
+<div id="dash">
+  <!-- Filtro global -->
+  <div class="filterbar card">
+    <span style="font-size:13px;color:var(--muted);font-weight:600">Filtros:</span>
+    <div class="ms" id="fCamp"></div>
+    <div class="ms" id="fOp"></div>
+    <span style="font-size:13px;color:var(--muted);font-weight:600">Data</span>
+    <input type="date" id="dStart" class="dateinput" title="Data inicial">
+    <span style="color:var(--muted);font-size:13px">até</span>
+    <input type="date" id="dEnd" class="dateinput" title="Data final">
+    <button class="btn ghost" id="clearDates" style="padding:6px 10px">limpar</button>
+    <span class="sub" id="filterInfo"></span>
+  </div>
+
+  <div class="printinfo" id="printinfo"></div>
+
+  <!-- KPIs -->
+  <div class="grid kpis" id="kpis"></div>
+
+  <!-- Alertas -->
+  <div class="sec card">
+    <h2>⚡ Alertas inteligentes</h2>
+    <div id="alerts"></div>
+  </div>
+
+  <!-- Ranking de agentes -->
+  <div class="sec card">
+    <div class="secthead">
+      <h2>👥 Desempenho por agente <span class="hint">(clique no cabeçalho para ordenar)</span></h2>
+      <div class="ms" id="fAgents"></div>
+    </div>
+    <table id="agentTable">
+      <thead><tr>
+        <th data-k="nome">Agente</th>
+        <th class="num" data-k="total">Chamadas</th>
+        <th class="num" data-k="contato">Atendidas (+30s – 1min)</th>
+        <th class="num" data-k="pctContato">% Atend. – 1min</th>
+        <th class="num" data-k="qualif">Contatos + 1min</th>
+        <th class="num" data-k="pctQualif">% Atend. + 1min</th>
+        <th class="num" data-k="tempo">Tempo falado</th>
+        <th class="num" data-k="media">Média/atend.</th>
+      </tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <!-- Ligações por hora -->
+  <div class="sec card">
+    <div class="secthead">
+      <h2>🕐 Ligações por hora <span class="hint">(faixa real — 8h = 08:00 às 08:59)</span></h2>
+      <div class="ms" id="fHours"></div>
+    </div>
+    <div class="legend">
+      <span><i class="dot" style="background:var(--accent)"></i> Total discadas</span>
+      <span><i class="dot" style="background:var(--good)"></i> Atendidas (+30s)</span>
+    </div>
+    <div class="hours" id="hours"></div>
+  </div>
+
+  <!-- Qualidade por duração -->
+  <div class="sec card">
+    <h2>⏱️ Distribuição por duração <span class="hint">(de todas as chamadas discadas)</span></h2>
+    <div id="durBreak"></div>
+  </div>
+
+  <!-- Rediscagens -->
+  <div class="sec card" id="redialSection">
+    <div class="secthead">
+      <h2>🔁 Números mais discados <span class="hint">(rediscagens / follow-up)</span></h2>
+      <div class="ms" id="fRedial"></div>
+    </div>
+    <table id="redialTable">
+      <thead><tr>
+        <th>Número</th><th class="num">Tentativas</th><th class="num">Atendidas (+30s)</th><th>Agente(s)</th>
+      </tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="sub" id="footnote" style="margin-top:20px;text-align:center">
+    Gerado localmente no navegador · nenhum dado é enviado para a internet.
+  </div>
+</div>
+
+<script>
+// ====== Critérios ======
+const ATEND_MIN = 30;   // > 30s = ligação considerada atendida (conversa real)
+const QUALIF_MIN = 60;  // > 60s = qualificada
+
+// ====== Util ======
+const $ = s => document.querySelector(s);
+function durToSec(v){
+  if(v==null) return 0;
+  if(v instanceof Date) return v.getHours()*3600+v.getMinutes()*60+v.getSeconds();
+  if(typeof v==='number'){ return v<1 ? Math.round(v*86400) : Math.round((v-Math.floor(v))*86400)||Math.round(v); }
+  const p=String(v).trim().split(':').map(Number);
+  if(p.length===3) return (p[0]||0)*3600+(p[1]||0)*60+(p[2]||0);
+  if(p.length===2) return (p[0]||0)*60+(p[1]||0);
+  return Number(v)||0;
+}
+function fmtDur(s){
+  s=Math.round(s); const h=Math.floor(s/3600), m=Math.floor((s%3600)/60), x=s%60;
+  return (h>0? String(h).padStart(2,'0')+':':'')+String(m).padStart(2,'0')+':'+String(x).padStart(2,'0');
+}
+let DATE_DAYFIRST=true; // dd/mm/aaaa (BR) por padrão; detectado por coluna no carregamento
+// Detecta a ordem (dia/mês ou mês/dia) olhando a coluna de data
+function detectDayFirst(rows,hi,colIdx){
+  let dd=false, mm=false;
+  for(let i=hi+1;i<Math.min(rows.length,hi+800);i++){
+    const m=String(rows[i]&&rows[i][colIdx]||'').match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+    if(m){ if(+m[1]>12)dd=true; if(+m[2]>12)mm=true; }
+  }
+  return mm&&!dd ? false : true; // só vira mês/dia se houver prova (2º campo >12) e nenhuma prova de dia/mês
+}
+function parseDate(v){
+  if(v instanceof Date) return v;
+  const s=String(v).trim();
+  let m=s.match(/(\d{4})-(\d{1,2})-(\d{1,2})[ T]?(\d{1,2})?:?(\d{2})?:?(\d{2})?/);
+  if(m) return new Date(+m[1],+m[2]-1,+m[3],+(m[4]||0),+(m[5]||0),+(m[6]||0));
+  m=s.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})[ ,]*(\d{1,2})?:?(\d{2})?:?(\d{2})?/);
+  if(m){ let y=+m[3]; if(y<100)y+=2000;
+    const a=+m[1], b=+m[2], day=DATE_DAYFIRST?a:b, mon=DATE_DAYFIRST?b:a;
+    return new Date(y,mon-1,day,+(m[4]||0),+(m[5]||0),+(m[6]||0)); }
+  return new Date(s);
+}
+const norm = s => String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+// Limpa nomes corrompidos na exportação (ex.: "EMILIANA MOURA DE S</td>5532984697053" -> "EMILIANA MOURA DE S")
+function cleanName(s){ s=String(s||'').replace(/[<>|].*$/,'').replace(/\/?td>?.*$/i,'').replace(/\s*\d.*$/,'').trim(); return s||'(sem agente)'; }
+// Detecta a coluna de telefone por CONTEÚDO — robusto a cabeçalho corrompido ("Número" vira "N򭥲o" em alguns .xls)
+function _cN(R,T,i){ const rv=R&&R[i]; if(typeof rv==='number')return String(rv); const tv=T&&T[i]; return tv!=null?String(tv):''; }
+function detectPhoneCol(rows,rowsRaw,hi){
+  const head=(rows[hi]||[]).map(norm);
+  const EXC=['protocolo','data','ramal','agente','status','campanha','fila','tabula','dura'];
+  const stats=c=>{ let n=0,ph=0,c55=0; for(let i=hi+1;i<Math.min(rows.length,hi+401);i++){ const T=rows[i]; if(!T)continue; const v=_cN(rowsRaw[i]||[],T,c); if(!v||!/\d/.test(v))continue; const d=v.replace(/\D/g,''); n++; if(d.length>=10&&d.length<=13)ph++; if(/^55\d{10,11}$/.test(d))c55++; } return {n,ph,c55}; };
+  for(const kw of ['numero','telefone','fone','contato']){ const c=head.findIndex(h=>h.includes(kw)); if(c>=0){ const s=stats(c); if(s.n>=5&&s.ph/s.n>=0.5)return c; } }
+  let best=-1,score=-1,ncol=Math.max(...rows.slice(hi+1,hi+30).map(x=>x?x.length:0));
+  for(let c=0;c<ncol;c++){ if(head[c]&&EXC.some(e=>head[c].includes(e)))continue; const s=stats(c); if(s.n<10||s.ph/s.n<0.5)continue; const sc=s.c55/s.n*2+s.ph/s.n; if(sc>score){score=sc;best=c;} }
+  return best;
+}
+
+// ====== Estado ======
+let ALL=[];                       // todos os registros
+let selCamp=new Set(), selOp=new Set();              // filtros globais (topo)
+let selAgents=new Set(), selHours=new Set(), selRedial=new Set(); // filtros por quadro
+let dateStart=null, dateEnd=null;
+let agentSort={k:'qualif',dir:-1};
+function parseInputDate(v){ const m=String(v).match(/(\d{4})-(\d{2})-(\d{2})/); return m?new Date(+m[1],+m[2]-1,+m[3]):null; }
+function inDate(x){ if(!dateStart&&!dateEnd) return true; const d=x.dt; if(!d||isNaN(d)) return false;
+  if(dateStart&&d<dateStart) return false; if(dateEnd){ const e=new Date(dateEnd); e.setHours(23,59,59,999); if(d>e) return false; } return true; }
+
+// Formata telefone BR: 5527997354423 -> (27) 99735-4423
+function fmtPhone(s){
+  let n=String(s).replace(/\D/g,'');
+  if(n.startsWith('55')&&n.length>=12) n=n.slice(2);
+  if(n.length===11) return `(${n.slice(0,2)}) ${n.slice(2,7)}-${n.slice(7)}`;
+  if(n.length===10) return `(${n.slice(0,2)}) ${n.slice(2,6)}-${n.slice(6)}`;
+  return String(s||'').trim();
+}
+
+// ====== Tema ======
+// O botão mostra a AÇÃO: se está escuro, oferece "Modo claro"; se está claro, oferece "Modo escuro".
+function setThemeLabel(){
+  const light=document.body.classList.contains('light');
+  $('#themeBtn').textContent = light ? '🌙 Modo escuro' : '☀️ Modo claro';
+}
+function toggleTheme(){
+  document.body.classList.toggle('light');
+  try{ localStorage.setItem('dash_theme', document.body.classList.contains('light')?'light':'dark'); }catch(e){}
+  setThemeLabel();
+}
+(function initTheme(){
+  let t='dark'; try{ t=localStorage.getItem('dash_theme')||'dark'; }catch(e){}
+  if(t==='light') document.body.classList.add('light');
+  setThemeLabel();
+})();
+
+// ====== Multiselect reutilizável ======
+function buildMultiSelect(sel,label,options,selected,onChange){
+  const el=$(sel); el.classList.add('ms');
+  el.innerHTML='<button class="ms-btn" type="button"></button><div class="ms-panel"></div>';
+  const btn=el.querySelector('.ms-btn'), panel=el.querySelector('.ms-panel');
+  const esc=s=>String(s).replace(/"/g,'&quot;');
+  function labelTxt(){
+    if(selected.size>=options.length) return label+': Todos';
+    if(selected.size===0) return label+': Nenhum';
+    return label+': '+selected.size+' de '+options.length;
+  }
+  function build(){
+    btn.textContent=labelTxt();
+    panel.innerHTML='<label class="ms-all"><input type="checkbox" '+(selected.size>=options.length?'checked':'')+'> (Todos)</label>'+
+      options.map(o=>'<label><input type="checkbox" value="'+esc(o)+'" '+(selected.has(o)?'checked':'')+'> '+o+'</label>').join('');
+    panel.querySelector('.ms-all input').onchange=e=>{
+      selected.clear(); if(e.target.checked) options.forEach(o=>selected.add(o));
+      build(); onChange();
+    };
+    panel.querySelectorAll('label:not(.ms-all) input').forEach(inp=>{
+      inp.onchange=()=>{ inp.checked?selected.add(inp.value):selected.delete(inp.value); build(); onChange(); };
+    });
+  }
+  btn.onclick=e=>{ e.stopPropagation(); const wasOpen=el.classList.contains('open');
+    document.querySelectorAll('.ms.open').forEach(x=>x.classList.remove('open'));
+    if(!wasOpen) el.classList.add('open'); };
+  panel.onclick=e=>e.stopPropagation();
+  build();
+}
+document.addEventListener('click',()=>document.querySelectorAll('.ms.open').forEach(e=>e.classList.remove('open')));
+
+// ====== Leitura ======
+function processWorkbook(wb){
+  const ws=wb.Sheets[wb.SheetNames[0]];
+  const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,defval:null}); // texto formatado (à prova de fuso)
+  const rowsRaw=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});  // bruto (telefone sem notação científica)
+  let hi=rows.findIndex(r=>r&&r.some(c=>norm(c)==='data')&&r.some(c=>norm(c).includes('agente')));
+  if(hi<0) hi=0;
+  const head=rows[hi].map(norm);
+  const col=name=>head.findIndex(h=>h.includes(name));
+  const ci={data:col('data'),agente:col('agente'),status:col('status'),dur:col('dura'),
+            num:col('numero'),tab:col('tabula'),camp:col('campanha'),fila:col('fila')};
+  const numDet=detectPhoneCol(rows,rowsRaw,hi); if(numDet>=0) ci.num=numDet; // à prova de cabeçalho corrompido
+  DATE_DAYFIRST=detectDayFirst(rows,hi,ci.data); // detecta dd/mm vs mm/dd antes de parsear as datas
+  ALL=rows.slice(hi+1).map((r,i)=>({r,raw:rowsRaw[hi+1+i]||[]}))
+    .filter(o=>o.r&&o.r[ci.data]!=null&&String(o.r[ci.data]).trim()!=='').map(({r,raw})=>{
+    const dur=durToSec(r[ci.dur]);
+    const rawNum=raw[ci.num]; // valor numérico bruto do telefone
+    return {
+      dt:parseDate(r[ci.data]),
+      agente:cleanName(r[ci.agente]),
+      status:String(r[ci.status]||'').trim(),
+      dur,
+      atend: dur>ATEND_MIN,
+      contato: dur>ATEND_MIN && dur<=QUALIF_MIN,
+      qualif: dur>QUALIF_MIN,
+      numRaw:(rawNum!=null?String(rawNum):String(r[ci.num]||'')).replace(/\D/g,''),
+      num:fmtPhone(rawNum!=null?rawNum:r[ci.num]),
+      tab:String(r[ci.tab]||'').trim(),
+      camp:String(r[ci.camp]||r[ci.fila]||'(sem campanha)').trim(),
+    };
+  });
+  // filtros globais (topo)
+  const camps=[...new Set(ALL.map(x=>x.camp))].sort();
+  const ags=[...new Set(ALL.map(x=>x.agente))].sort();
+  selCamp=new Set(camps); selOp=new Set(ags);
+  buildMultiSelect('#fCamp','Campanha',camps,selCamp,onGlobalChange);
+  buildMultiSelect('#fOp','Operadores',ags,selOp,onGlobalChange);
+  refreshSubFilters();
+  $('#drop').style.display='none'; $('#dash').style.display='block';
+  $('#reloadBtn').style.display='inline-block'; $('#pdfBtn').style.display='inline-block';
+  renderAll();
+}
+
+// Exporta o dashboard atual (já com os filtros aplicados) para PDF via impressão nativa
+function exportPDF(){
+  document.querySelectorAll('.ms.open').forEach(e=>e.classList.remove('open'));
+  window.print();
+}
+
+// dados após filtros globais (campanha + operadores do líder)
+function fData(){ return ALL.filter(x=>selCamp.has(x.camp)&&selOp.has(x.agente)&&inDate(x)); }
+
+function onGlobalChange(){ refreshSubFilters(); renderAll(); }
+
+// reconstrói os sub-filtros por quadro com base nos operadores disponíveis após o filtro global
+function refreshSubFilters(){
+  const ags=[...new Set(fData().map(x=>x.agente))].sort();
+  selAgents=new Set(ags); selHours=new Set(ags); selRedial=new Set(ags);
+  buildMultiSelect('#fAgents','Operadores',ags,selAgents,renderAgents);
+  buildMultiSelect('#fHours','Operador',ags,selHours,renderHours);
+  buildMultiSelect('#fRedial','Operador',ags,selRedial,renderRedial);
+}
+
+function renderAll(){ renderHeader(); renderKPIs(); renderAlerts(); renderAgents(); renderHours(); renderDur(); renderRedial(); }
+
+function renderHeader(){
+  const d=fData(); const dts=d.map(x=>x.dt).filter(x=>x&&!isNaN(x));
+  if(!dts.length){ $('#periodo').textContent='Sem registros para o filtro selecionado.'; $('#filterInfo').textContent=''; return; }
+  const min=new Date(Math.min(...dts)), max=new Date(Math.max(...dts));
+  const f=x=>x.toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  const periodoTxt=`Período: ${f(min)} até ${f(max)} · ${d.length} chamadas`;
+  $('#periodo').textContent=periodoTxt;
+  $('#filterInfo').textContent = d.length<ALL.length ? `(filtrado: ${d.length} de ${ALL.length} chamadas)` : '';
+  // título do documento (vira o nome do PDF) + linha de info impressa
+  const allCamps=[...new Set(ALL.map(x=>x.camp))], allAgs=[...new Set(ALL.map(x=>x.agente))];
+  const camp = selCamp.size<allCamps.length ? [...selCamp].join(', ') : 'Todas';
+  const ops = selOp.size<allAgs.length ? [...selOp].join(', ') : 'Todos os operadores';
+  document.title = 'Dashboard de Ligações — ' + max.toLocaleDateString('pt-BR');
+  const emitido = new Date().toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  const perTxt=(dateStart||dateEnd)?` · Filtro de data: ${dateStart?dateStart.toLocaleDateString('pt-BR'):'início'} até ${dateEnd?dateEnd.toLocaleDateString('pt-BR'):'fim'}`:'';
+  $('#printinfo').innerHTML = `<b>${periodoTxt}</b>${perTxt}<br>Campanha: ${camp} · Equipe: ${ops} · Emitido em ${emitido}`;
+}
+
+function renderKPIs(){
+  const d=fData(), n=d.length;
+  const at=d.filter(x=>x.atend).length;
+  const contato=d.filter(x=>x.contato).length;
+  const qual=d.filter(x=>x.qualif).length;
+  const tempo=d.filter(x=>x.atend).reduce((s,x)=>s+x.dur,0);
+  const media=at?tempo/at:0;
+  const pct=v=>n?(v/n*100).toFixed(0):0;
+  const cards=[
+    {label:'Total de chamadas',val:n,foot:'discadas no período',cls:'accent'},
+    {label:'Atendidas (+30s)',val:at,foot:`${pct(at)}% · conversa real`,cls:'good'},
+    {label:'Não atendidas',val:n-at,foot:`${pct(n-at)}% · ≤30s ou sem fala`,cls:'bad'},
+    {label:'Contatos 30s–1min',val:contato,foot:'conversa curta',cls:'qualif'},
+    {label:'Qualificados (+1min)',val:qual,foot:'conversas longas',cls:'qualif'},
+    {label:'Tempo total falado',val:fmtDur(tempo),foot:'soma das atendidas',cls:'accent'},
+    {label:'Duração média',val:fmtDur(media),foot:'por atendida (+30s)',cls:''},
+  ];
+  $('#kpis').innerHTML=cards.map(c=>`<div class="card kpi ${c.cls}"><div class="label">${c.label}</div><div class="val">${c.val}</div><div class="foot">${c.foot}</div></div>`).join('');
+}
+
+function renderAlerts(){
+  const d=fData(), n=d.length||1, box=$('#alerts'); box.innerHTML='';
+  const semTab=d.filter(x=>norm(x.tab).includes('nao tab')||x.tab==='').length;
+  const lixo=d.filter(x=>x.dur<=5).length;
+  const at=d.filter(x=>x.atend).length;
+  const A=[];
+  if(semTab/n>0.5) A.push(['bad','🏷️',`<b>${(semTab/n*100).toFixed(0)}% das chamadas estão SEM tabulação.</b> Sem isso não dá pra saber o resultado (venda, agendamento, recusa). Cobre a equipe para tabular.`]);
+  if(lixo/n>0.4) A.push(['warn','📵',`<b>${(lixo/n*100).toFixed(0)}% das chamadas duraram ≤ 5s.</b> Provável caixa postal ou cliente desligando no "alô".`]);
+  if(at/n<0.15) A.push(['warn','🎯',`<b>Só ${(at/n*100).toFixed(0)}% viraram conversa real (+30s).</b> Avaliar qualidade do mailing e horário das ligações.`]);
+  const byAg=aggAgents(d);
+  if(byAg.length>1){
+    const mediaTaxa=byAg.reduce((s,a)=>s+a.taxa,0)/byAg.length;
+    const fracos=byAg.filter(a=>a.total>=5 && a.taxa<mediaTaxa*0.6);
+    if(fracos.length){
+      const nomes=[...new Set(fracos.map(f=>f.nome))];            // nome completo, sem repetir
+      const LIM=12, lista=nomes.slice(0,LIM).join(', ')+(nomes.length>LIM?` e mais ${nomes.length-LIM}`:'');
+      A.push(['warn','📉',`Abaixo da média da equipe em conversas efetivas (${nomes.length}): <b>${lista}</b>. Vale acompanhar.`]);
+    }
+    const top=byAg.slice().sort((a,b)=>b.atend-a.atend)[0];
+    if(top&&top.atend>0) A.push(['good','🏆',`Destaque: <b>${top.nome}</b> com ${top.atend} atendidas (+30s) e ${fmtDur(top.tempo)} falados.`]);
+  }
+  if(!A.length) A.push(['good','✅','Nenhum alerta crítico no recorte atual.']);
+  box.innerHTML=A.map(([c,i,t])=>`<div class="alert ${c}"><span class="ai">${i}</span><div>${t}</div></div>`).join('');
+}
+
+function aggAgents(d){
+  const m={};
+  for(const x of d){
+    const a=m[x.agente]||(m[x.agente]={nome:x.agente,total:0,atend:0,contato:0,qualif:0,tempo:0});
+    a.total++; if(x.atend){a.atend++;a.tempo+=x.dur;} if(x.contato)a.contato++; if(x.qualif)a.qualif++;
+  }
+  return Object.values(m).map(a=>({...a,
+    taxa:a.total?a.atend/a.total*100:0,
+    pctContato:a.total?a.contato/a.total*100:0,
+    pctQualif:a.total?a.qualif/a.total*100:0,
+    media:a.atend?a.tempo/a.atend:0}));
+}
+
+function renderAgents(){
+  let rows=aggAgents(fData()).filter(r=>selAgents.has(r.nome));
+  const k=agentSort.k,dir=agentSort.dir;
+  rows.sort((a,b)=>typeof a[k]==='string'?a[k].localeCompare(b[k])*dir:(a[k]-b[k])*dir);
+  const maxTotal=Math.max(...rows.map(r=>r.total),1);
+  const tb=$('#agentTable tbody');
+  if(!rows.length){ tb.innerHTML='<tr><td colspan="8" class="sub">Nenhum operador selecionado.</td></tr>'; return; }
+  tb.innerHTML=rows.map(r=>{
+    return `<tr>
+      <td>${r.nome}</td>
+      <td class="num"><div style="display:flex;align-items:center;gap:8px;justify-content:flex-end"><span>${r.total}</span><div class="bar-wrap" style="width:50px"><div class="bar" style="width:${r.total/maxTotal*100}%;background:var(--accent)"></div></div></div></td>
+      <td class="num" style="font-weight:700">${r.contato}</td>
+      <td class="num" style="color:var(--muted)">${r.pctContato.toFixed(1)}%</td>
+      <td class="num" style="color:var(--qualif);font-weight:700">${r.qualif}</td>
+      <td class="num" style="color:var(--qualif)">${r.pctQualif.toFixed(1)}%</td>
+      <td class="num">${fmtDur(r.tempo)}</td>
+      <td class="num">${fmtDur(r.media)}</td>
+    </tr>`;
+  }).join('');
+}
+document.querySelectorAll('#agentTable th').forEach(th=>{
+  th.addEventListener('click',()=>{ const k=th.dataset.k; if(!k)return;
+    if(agentSort.k===k) agentSort.dir*=-1; else {agentSort.k=k; agentSort.dir=k==='nome'?1:-1;}
+    renderAgents();
+  });
+});
+$('#dStart').onchange=e=>{ dateStart=parseInputDate(e.target.value); onGlobalChange(); };
+$('#dEnd').onchange=e=>{ dateEnd=parseInputDate(e.target.value); onGlobalChange(); };
+$('#clearDates').onclick=()=>{ dateStart=dateEnd=null; $('#dStart').value=''; $('#dEnd').value=''; onGlobalChange(); };
+
+function renderHours(){
+  const d=fData().filter(x=>selHours.has(x.agente)), b={};
+  for(const x of d){ if(!x.dt||isNaN(x.dt))continue; const h=x.dt.getHours();
+    const o=b[h]||(b[h]={total:0,at:0}); o.total++; if(x.atend)o.at++; }
+  const hrs=Object.keys(b).map(Number).sort((a,c)=>a-c);
+  const max=Math.max(...hrs.map(h=>b[h].total),1);
+  $('#hours').innerHTML=hrs.map(h=>{
+    const o=b[h], H=v=>Math.max(v/max*100,1.5);
+    return `<div class="hcol" title="${h}h — ${o.total} discadas, ${o.at} atendidas (+30s)">
+      <div class="hcount">${o.total}</div>
+      <div class="hbars">
+        <div class="hbar" style="height:${H(o.total)}%;background:var(--accent)"></div>
+        <div class="hbar" style="height:${H(o.at)}%;background:var(--good)"></div>
+      </div>
+      <div class="hlbl">${String(h).padStart(2,'0')}h</div>
+    </div>`;
+  }).join('')||'<div class="sub">Sem dados de horário.</div>';
+}
+
+function renderDur(){
+  const d=fData(), tot=d.length||1;
+  const faixas=[
+    ['0s (não falou)',x=>x.dur===0,'var(--bad)'],
+    ['1–5s (caixa/desligou)',x=>x.dur>0&&x.dur<=5,'var(--bad)'],
+    ['6–30s (curta)',x=>x.dur>5&&x.dur<=30,'var(--warn)'],
+    ['30s–1min (contato)',x=>x.dur>30&&x.dur<=60,'var(--good)'],
+    ['+1min (qualificado)',x=>x.dur>60,'var(--qualif)'],
+  ];
+  $('#durBreak').innerHTML=faixas.map(([lbl,fn,col])=>{
+    const c=d.filter(fn).length,p=c/tot*100;
+    return `<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px"><span>${lbl}</span><span style="color:var(--muted)">${c} · ${p.toFixed(0)}%</span></div><div class="bar-wrap" style="height:10px"><div class="bar" style="width:${p}%;background:${col}"></div></div></div>`;
+  }).join('')+`<div class="sub" style="margin-top:8px">Base: ${d.length} chamadas discadas.</div>`;
+}
+
+function renderRedial(){
+  const d=fData().filter(x=>selRedial.has(x.agente));
+  const m={};
+  for(const x of d){ if(!x.numRaw)continue;
+    const r=m[x.numRaw]||(m[x.numRaw]={num:x.num,n:0,at:0,ags:new Set()});
+    r.n++; if(x.atend)r.at++; r.ags.add(x.agente.split(' ')[0]); }
+  const rows=Object.values(m).filter(r=>r.n>1).sort((a,b)=>b.n-a.n).slice(0,20);
+  const tb=$('#redialTable tbody');
+  if(!rows.length){ tb.innerHTML='<tr><td colspan="4" class="sub">Nenhum número discado mais de uma vez no recorte atual.</td></tr>'; return; }
+  tb.innerHTML=rows.map(r=>`<tr><td>${r.num}</td><td class="num">${r.n}x</td><td class="num">${r.at}</td><td>${[...r.ags].join(', ')}</td></tr>`).join('');
+}
+
+// ====== Entrada de arquivo ======
+function handleFile(file){
+  $('#fname').textContent=file.name;
+  const fr=new FileReader();
+  fr.onload=e=>{ try{ processWorkbook(XLSX.read(e.target.result,{type:'array'})); }
+    catch(err){ alert('Não consegui ler o arquivo. Verifique se é o relatório .xlsx correto.\n\n'+err.message); } };
+  fr.readAsArrayBuffer(file);
+}
+// permite que o painel de gestão envie a planilha por mensagem (uso embutido em iframe)
+window.addEventListener('message',function(ev){ var d=ev.data||{}; if(d&&d.kind==='loadWorkbook'&&d.buffer){
+  try{ processWorkbook(XLSX.read(d.buffer,{type:'array'})); }catch(err){ alert('Erro ao processar a planilha de ligações: '+err.message); }
+  if(d.canChange===false){ var rb=document.getElementById('reloadBtn'); if(rb)rb.style.display='none'; } } });
+const drop=$('#drop');
+drop.onclick=()=>$('#file').click();
+$('#file').onchange=e=>{ if(e.target.files[0]) handleFile(e.target.files[0]); };
+['dragover','dragenter'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over');}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over');}));
+drop.addEventListener('drop',e=>{ const f=e.dataTransfer.files[0]; if(f) handleFile(f); });
+</script>
+</body>
+</html>

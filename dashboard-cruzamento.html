@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cruzamento de Dados</title>
+<script src="xlsx.full.min.js"></script>
+<style>
+  :root{--bg:#0f172a;--panel:#1e293b;--panel2:#273549;--line:#334155;--txt:#e2e8f0;--muted:#94a3b8;--accent:#38bdf8;--good:#34d399;--warn:#fbbf24;--bad:#f87171;--qualif:#a78bfa;--shadow:none;}
+  body.light{--bg:#eef2f7;--panel:#fff;--panel2:#f1f5f9;--line:#e2e8f0;--txt:#0f172a;--muted:#64748b;--accent:#0284c7;--good:#059669;--warn:#d97706;--bad:#dc2626;--qualif:#7c3aed;--shadow:0 1px 3px rgba(15,23,42,.08);}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--txt);padding:24px;line-height:1.4;transition:.2s}
+  h1{font-size:22px;font-weight:700} h2{font-size:15px;font-weight:600;margin-bottom:12px;color:var(--accent);text-transform:uppercase;letter-spacing:.5px}
+  .sub{color:var(--muted);font-size:13px;margin-top:2px}
+  header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+  .btn{background:var(--accent);color:#fff;border:none;padding:9px 16px;border-radius:8px;font-weight:600;cursor:pointer;font-size:13px}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  .btn.ghost{background:transparent;color:var(--accent);border:1px solid var(--line)}
+  .grid{display:grid;gap:14px} .kpis{grid-template-columns:repeat(auto-fit,minmax(165px,1fr))}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;box-shadow:var(--shadow)}
+  .kpi .label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+  .kpi .val{font-size:27px;font-weight:700;margin-top:4px} .kpi .foot{font-size:12px;color:var(--muted);margin-top:4px}
+  .kpi.accent .val{color:var(--accent)} .kpi.good .val{color:var(--good)} .kpi.bad .val{color:var(--bad)} .kpi.warn .val{color:var(--warn)} .kpi.qualif .val{color:var(--qualif)}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--line)}
+  th{color:var(--muted);font-weight:600;cursor:pointer;user-select:none;white-space:nowrap} th:hover{color:var(--accent)}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+  td.c,th.c{text-align:center}
+  tbody tr:hover{background:var(--panel2)}
+  .tablewrap{max-height:520px;overflow:auto}
+  .bar-wrap{background:var(--panel2);border-radius:5px;height:8px;overflow:hidden;min-width:50px}
+  .bar{height:100%;border-radius:5px}
+  .yes{color:var(--good);font-weight:700} .no{color:var(--muted)}
+  .filterbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px}
+  .ms{position:relative;display:inline-block}
+  .ms-btn{background:var(--panel);color:var(--txt);border:1px solid var(--line);padding:8px 28px 8px 12px;border-radius:8px;font-size:13px;cursor:pointer;position:relative;min-width:150px;text-align:left}
+  .ms-btn::after{content:'▾';position:absolute;right:10px;color:var(--muted)}
+  .ms-panel{display:none;position:absolute;z-index:50;top:calc(100% + 4px);left:0;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px;min-width:260px;max-height:340px;overflow:auto;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+  .ms.open .ms-panel{display:block}
+  .ms-search{width:100%;padding:7px 9px;margin-bottom:6px;border:1px solid var(--line);border-radius:6px;background:var(--panel2);color:var(--txt);font-size:13px}
+  .ms-panel label{display:flex;gap:8px;align-items:center;padding:5px 8px;border-radius:6px;font-size:13px;cursor:pointer}
+  .ms-panel label:hover{background:var(--panel2)} .ms-panel .ms-all{border-bottom:1px solid var(--line);font-weight:600;margin-bottom:4px}
+  select,.sel,.dateinput{background:var(--panel);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:7px 10px;font-size:13px}
+  .dateinput::-webkit-calendar-picker-indicator{filter:invert(.6)} body.light .dateinput::-webkit-calendar-picker-indicator{filter:none}
+  .secthead{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px} .secthead h2{margin-bottom:0}
+  #dash{display:none} .sec{margin-top:18px} .filename{font-size:13px;color:var(--muted)}
+  .hint{font-size:11px;color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0}
+  /* setup */
+  #setup{max-width:840px;margin:0 auto}
+  .uploads{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:20px 0}
+  @media(max-width:700px){.uploads{grid-template-columns:1fr}}
+  .uz{border:2px dashed var(--line);border-radius:12px;padding:22px 16px;text-align:center;cursor:pointer;transition:.2s}
+  .uz:hover,.uz.over{border-color:var(--accent);background:var(--panel2)} .uz.ok{border-color:var(--good);background:rgba(52,211,153,.08)}
+  .uz .ic{font-size:32px;margin-bottom:6px} .uz .t{font-weight:700} .uz .f{font-size:12px;color:var(--good);margin-top:8px;word-break:break-all;font-weight:600}
+  .printinfo{display:none}
+  @media print{ @page{size:A4 landscape;margin:9mm;}
+    body,body.light{--bg:#fff;--panel:#fff;--panel2:#eef2f7;--line:#cbd5e1;--txt:#0f172a;--muted:#475569;--accent:#0284c7;--good:#059669;--bad:#dc2626;--qualif:#6d28d9;--shadow:none;}
+    body{padding:0;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+    .filterbar,#pdfBtn,#themeBtn,.ms,select,.hint{display:none!important} .printinfo{display:block;font-size:12px;color:#475569;margin-bottom:8px}
+    .card,.sec{break-inside:avoid} table{font-size:10px} .tablewrap{max-height:none;overflow:visible} }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>🔗 Cruzamento de Dados</h1>
+    <div class="sub" id="periodo">Cruza Matrículas × Ligações × Atendimentos pelo telefone.</div>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center">
+    <button class="btn" id="pdfBtn" style="display:none" onclick="exportPDF()">📄 Exportar PDF</button>
+    <button class="btn ghost" id="themeBtn" onclick="toggleTheme()">☀️ Modo claro</button>
+    <button class="btn ghost" id="reloadBtn" style="display:none" onclick="location.reload()">Recomeçar</button>
+  </div>
+</header>
+
+<div id="setup">
+  <div class="card">
+    <h2>Carregar os relatórios para cruzar</h2>
+    <p class="sub">Matrículas é a base. Ligações e Atendimentos são opcionais (envie pelo menos um deles para cruzar).</p>
+    <div class="uploads">
+      <div class="uz" id="uzMat"><div class="ic">🎓</div><div class="t">Matrículas (base)</div><div class="hint">.xlsx</div><div class="f" id="fMatName"></div></div>
+      <div class="uz" id="uzLig"><div class="ic">📞</div><div class="t">Ligações</div><div class="hint">.xlsx</div><div class="f" id="fLigName"></div></div>
+      <div class="uz" id="uzAt"><div class="ic">💬</div><div class="t">Atendimentos</div><div class="hint">.xls</div><div class="f" id="fAtName"></div></div>
+    </div>
+    <div style="display:flex;justify-content:center"><button class="btn" id="crossBtn" disabled>🔗 Cruzar dados ▶</button></div>
+  </div>
+  <input type="file" id="inpMat" accept=".xlsx,.xls" style="display:none">
+  <input type="file" id="inpLig" accept=".xlsx,.xls" style="display:none">
+  <input type="file" id="inpAt" accept=".xls,.xlsx" style="display:none">
+</div>
+
+<div id="dash">
+  <div class="filterbar card">
+    <span style="font-size:13px;color:var(--muted);font-weight:600">Filtros:</span>
+    <div class="ms" id="fMod"></div>
+    <div class="ms" id="fUni"></div>
+    <div class="ms" id="fOp"></div>
+    <div class="ms" id="fCurso"></div>
+    <label style="font-size:13px;display:inline-flex;gap:6px;align-items:center;cursor:pointer" title="Conta apenas 1 matrícula por CPF nas modalidades Pós-Graduação EAD e Cursos Livres">
+      <input type="checkbox" id="dedupCpf" checked> 1 matr./CPF <span class="hint">(Pós/Livres)</span>
+    </label>
+    <span style="font-size:13px;color:var(--muted);font-weight:600">Período por</span>
+    <select id="dateBasis">
+      <option value="dMat">Data Matrícula</option>
+      <option value="dPre">Data Pré-matrícula</option>
+      <option value="dPag">Data Pagamento</option>
+    </select>
+    <input type="date" id="dStart" class="dateinput" title="Data inicial">
+    <span style="color:var(--muted);font-size:13px">até</span>
+    <input type="date" id="dEnd" class="dateinput" title="Data final">
+    <button class="btn ghost" id="clearDates" style="padding:6px 10px">limpar</button>
+    <span style="font-size:13px;color:var(--muted);margin-left:6px">Ligação atendida =</span>
+    <select id="critLig">
+      <option value="efetiva">Conversa real (&gt;30s)</option>
+      <option value="atendida">Qualquer "Atendida"</option>
+      <option value="qualquer">Qualquer ligação</option>
+    </select>
+    <span style="font-size:13px;color:var(--muted);margin-left:6px">Casar nomes por</span>
+    <select id="nameMatch" title="Como considerar o mesmo operador quando o nome está escrito diferente nos relatórios">
+      <option value="firstlast">Primeiro + último nome</option>
+      <option value="full">Nome completo</option>
+      <option value="first">Só primeiro nome</option>
+    </select>
+    <span class="sub" id="filterInfo"></span>
+  </div>
+
+  <div class="printinfo" id="printinfo"></div>
+
+  <div class="grid kpis" id="kpis"></div>
+
+  <div class="sec card">
+    <h2>📊 Resumo do cruzamento</h2>
+    <div id="resumo"></div>
+  </div>
+
+  <div class="sec card">
+    <div class="secthead"><h2>👥 Cobertura por operador (da matrícula)</h2></div>
+    <div class="tablewrap">
+      <table id="opTable">
+        <thead><tr>
+          <th data-k="nome">Operador</th>
+          <th class="num" data-k="leads">Leads (tel.)</th>
+          <th class="num" data-k="lig">c/ Ligação atendida</th>
+          <th class="num" data-k="at">c/ Atendimento wpp</th>
+          <th class="num" data-k="ambos">c/ Ambos</th>
+          <th class="num" data-k="cobertura">% com algum contato</th>
+        </tr></thead><tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="sec card">
+    <div class="secthead"><h2>🧑‍💼 Operadores nos relatórios <span class="hint">(mesmo nome casado entre Matrículas / Ligações / Atendimentos)</span></h2></div>
+    <div class="tablewrap" style="max-height:420px">
+      <table id="opCrossTable">
+        <thead><tr>
+          <th data-k="nome">Operador</th>
+          <th class="c" data-k="mat">Matrículas</th>
+          <th class="c" data-k="lig">Ligações</th>
+          <th class="c" data-k="at">Atendimentos</th>
+          <th class="num" data-k="nfontes">Em quantos</th>
+          <th class="num" data-k="leads">Leads (matrícula)</th>
+        </tr></thead><tbody></tbody>
+      </table>
+    </div>
+    <div class="sub" id="opCrossInfo" style="margin-top:8px"></div>
+  </div>
+
+  <div class="sec card">
+    <div class="secthead"><h2>✍️ Variações de escrita do mesmo operador <span class="hint">(grafias diferentes que foram casadas)</span></h2></div>
+    <div class="tablewrap" style="max-height:360px">
+      <table id="nameDiagTable">
+        <thead><tr><th>Chave do nome</th><th>Em Matrículas</th><th>Em Ligações</th><th>Em Atendimentos</th></tr></thead><tbody></tbody>
+      </table>
+    </div>
+    <div class="sub" id="nameDiagInfo" style="margin-top:8px"></div>
+  </div>
+
+  <div class="sec card">
+    <div class="secthead">
+      <h2>📋 Leads cruzados</h2>
+      <select id="showFilter" class="sel">
+        <option value="match">Só com algum contato</option>
+        <option value="ambos">Só com ambos</option>
+        <option value="sem">Só sem contato</option>
+        <option value="todos">Todos</option>
+      </select>
+    </div>
+    <div class="tablewrap">
+      <table id="crossTable">
+        <thead><tr>
+          <th data-k="fone">Telefone</th>
+          <th data-k="nome">Nome</th>
+          <th data-k="op">Operador</th>
+          <th class="c" data-k="lig">Ligação atendida</th>
+          <th class="c" data-k="at">Atendimento wpp</th>
+        </tr></thead><tbody></tbody>
+      </table>
+    </div>
+    <div class="sub" id="crossInfo" style="margin-top:8px"></div>
+  </div>
+
+  <div class="sec card">
+    <div class="secthead"><h2>🔍 Diagnóstico de formatos <span class="hint">(mesmo número gravado em formatos diferentes entre relatórios)</span></h2></div>
+    <div class="tablewrap" style="max-height:360px">
+      <table id="diagTable">
+        <thead><tr>
+          <th>Chave normalizada</th><th>Formato em Matrículas</th><th>Formato em Ligações</th><th>Formato em Atendimentos</th>
+        </tr></thead><tbody></tbody>
+      </table>
+    </div>
+    <div class="sub" id="diagInfo" style="margin-top:8px"></div>
+  </div>
+
+  <div class="sub" id="footnote" style="margin-top:20px;text-align:center">Cruzamento por telefone normalizado · processado localmente no navegador.</div>
+</div>
+
+<script>
+const $=s=>document.querySelector(s);
+const norm=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,' ').trim();
+const int=n=>(n||0).toLocaleString('pt-BR');
+// chave canônica de telefone BR (resolve 55, 0 à esquerda, 9º dígito, formatação)
+function phoneKey(raw){ let d=String(raw==null?'':raw).replace(/\D/g,''); if(!d)return '';
+  if(d.startsWith('55')&&d.length>=12)d=d.slice(2); d=d.replace(/^0+/,'');
+  if(d.length>=11){const ddd=d.slice(0,2);let rest=d.slice(2);if(rest.length>=9&&rest[0]==='9')rest=rest.slice(1);return ddd+rest.slice(-8);}
+  if(d.length===10)return d.slice(0,2)+d.slice(2).slice(-8);
+  return d.length>=8?d.slice(-8):''; }
+function fmtPhone(s){ let n=String(s).replace(/\D/g,''); if(n.startsWith('55')&&n.length>=12)n=n.slice(2); n=n.replace(/^0+/,'');
+  if(n.length===11)return '('+n.slice(0,2)+') '+n.slice(2,7)+'-'+n.slice(7);
+  if(n.length===10)return '('+n.slice(0,2)+') '+n.slice(2,6)+'-'+n.slice(6);
+  if(n.length===8)return n.slice(0,4)+'-'+n.slice(4);
+  return String(s||''); }
+function sheets(buf){ const wb=XLSX.read(buf,{type:'array'}); const ws=wb.Sheets[wb.SheetNames[0]];
+  return {t:XLSX.utils.sheet_to_json(ws,{header:1,raw:false,defval:null}), r:XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null})}; }
+const cellNum=(R,T,i)=>{ const rv=R&&R[i]; if(typeof rv==='number')return String(rv); const tv=T&&T[i]; return tv!=null?String(tv):''; };
+const cell=(T,i)=> (T&&T[i]!=null)?String(T[i]).trim():'';
+function findCol(head,...alts){ const H=head.map(norm); for(const a of alts){const i=H.findIndex(h=>h===a);if(i>=0)return i;} for(const a of alts){const i=H.findIndex(h=>h.includes(a));if(i>=0)return i;} return -1; }
+// Limpa nomes corrompidos na exportação (ex.: "EMILIANA MOURA DE S</td>5532984697053" -> "EMILIANA MOURA DE S")
+function cleanName(s){ s=String(s||'').replace(/[<>|].*$/,'').replace(/\/?td>?.*$/i,'').replace(/\s*\d.*$/,'').trim(); return s; }
+function findHeader(rows,...keys){ const i=rows.findIndex(r=>r&&keys.every(k=>r.some(c=>norm(c).includes(k)))); return i; }
+// Detecta a coluna de telefone por CONTEÚDO — robusto a cabeçalho corrompido (ex.: "Número" vira "N򭥲o" em alguns .xls)
+const PH_EXC=['protocolo','data','ramal','agente','status','campanha','fila','tabula','dura','nome','cpf','matricula','curso','unidade','modalidade','mail','origem','grupo','classific','categoria','periodo','valor','registro','bairro','cep','logradouro','cidade','complemento','nascimento','aceite','venc','trancamento','pagamento','pre matricula'];
+function phoneStats(t,r,hi,c){ let n=0,ph=0,c55=0; for(let i=hi+1;i<Math.min(t.length,hi+401);i++){ const T=t[i]; if(!T)continue; const v=cellNum(r[i]||[],T,c); if(!v||!/\d/.test(v))continue; const d=v.replace(/\D/g,''); n++; if(d.length>=10&&d.length<=13)ph++; if(/^55\d{10,11}$/.test(d))c55++; } return {n,ph,c55}; }
+function detectPhoneCol(t,r,hi,...hdr){ const head=(t[hi]||[]).map(norm);
+  for(const kw of hdr){ const c=head.findIndex(h=>h.includes(kw)); if(c>=0){ const s=phoneStats(t,r,hi,c); if(s.n>=5&&s.ph/s.n>=0.5)return c; } }
+  let best=-1,score=-1,ncol=Math.max(...t.slice(hi+1,hi+30).map(x=>x?x.length:0));
+  for(let c=0;c<ncol;c++){ if(head[c]&&PH_EXC.some(e=>head[c].includes(e)))continue; const s=phoneStats(t,r,hi,c); if(s.n<10||s.ph/s.n<0.5)continue; const sc=s.c55/s.n*2+s.ph/s.n; if(sc>score){score=sc;best=c;} }
+  return best; }
+
+let matRecords=[];      // todos os registros de matrícula
+let matPhoneRaw=new Map(); // key -> raw (1º visto) p/ diagnóstico
+let BASE=[];            // matRecords após dedup CPF
+let ligMap=new Map();   // key -> {raw, efet, status}
+let atMap=new Map();    // key -> {raw}
+let selMod=new Set(),selUni=new Set(),selOp=new Set(),selCurso=new Set();
+let dedupCpf=true, dateBasis='dMat', dateStart=null, dateEnd=null;
+let crit='efetiva', showF='match', opSort={k:'leads',dir:-1}, crossSort={k:'op',dir:1};
+let hasLigFile=false, hasAtFile=false;
+let ligOpsRaw=new Set(), atOpsRaw=new Set(), nameMatch='firstlast', opCrossSort={k:'leads',dir:-1};
+// chave de nome p/ casar operadores escritos diferente (abreviação, sobrenomes, etc.)
+const NAME_STOP=new Set(['de','da','do','das','dos','e','di','del','la','dr','dra','sr','sra']);
+function nameTokens(s){ return norm(s).replace(/[^a-z0-9 ]/g,' ').split(/\s+/).filter(t=>t.length>=2&&!NAME_STOP.has(t)); }
+function nameKey(s){ const t=nameTokens(s); if(!t.length)return norm(s).trim();
+  if(nameMatch==='first') return t[0];
+  if(nameMatch==='firstlast') return t.length>1? t[0]+' '+t[t.length-1] : t[0];
+  return t.join(' '); }
+function parseDateBR(v){ if(v==null)return null; const s=String(v).trim(); if(!s)return null;
+  let m=s.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/); if(m){let y=+m[3];if(y<100)y+=2000;return new Date(y,+m[2]-1,+m[1]);}
+  m=s.match(/(\d{4})-(\d{1,2})-(\d{1,2})/); if(m)return new Date(+m[1],+m[2]-1,+m[3]); return null; }
+function parseInputDate(v){ const m=String(v).match(/(\d{4})-(\d{2})-(\d{2})/); return m?new Date(+m[1],+m[2]-1,+m[3]):null; }
+function numOf(v){ if(v==null)return 0; if(typeof v==='number')return v; return parseFloat(String(v).replace(/[^\d,.-]/g,'').replace(',','.'))||0; }
+function isDedupMod(m){ const x=norm(m); return x.includes('pos gradua')||x.includes('cursos livres'); }
+function scoreRep(x){ const sr=(x.nsMat.includes('matriculado')&&!x.nsMat.includes('pre'))?3:x.nsMat.includes('pre')?2:x.nsMat.includes('tranc')?1:0; return (x.valor>0?1:0)*1e15+sr*1e13+(x.dMat?x.dMat.getTime():0); }
+function dedupeByCpf(arr){ const keep=[],byCpf={}; for(const x of arr){ if(isDedupMod(x.mod)&&x.cpf){const p=byCpf[x.cpf];if(!p||scoreRep(x)>scoreRep(p))byCpf[x.cpf]=x;} else keep.push(x); } return keep.concat(Object.values(byCpf)); }
+function computeBase(){ BASE = dedupCpf ? dedupeByCpf(matRecords) : matRecords; }
+function inRange(x){ if(!dateStart&&!dateEnd)return true; const d=x[dateBasis]; if(!d)return false; if(dateStart&&d<dateStart)return false; if(dateEnd&&d>dateEnd)return false; return true; }
+function filteredRecords(){ return BASE.filter(x=>selMod.has(x.mod)&&selUni.has(x.uni)&&selOp.has(x.op)&&selCurso.has(x.curso)&&inRange(x)); }
+
+function setThemeLabel(){ $('#themeBtn').textContent=document.body.classList.contains('light')?'🌙 Modo escuro':'☀️ Modo claro'; }
+function toggleTheme(){ document.body.classList.toggle('light'); try{localStorage.setItem('dash_theme',document.body.classList.contains('light')?'light':'dark');}catch(e){} setThemeLabel(); if(matMap.size)renderAll(); }
+(function(){ let t='dark'; try{t=localStorage.getItem('dash_theme')||'dark';}catch(e){} if(t==='light')document.body.classList.add('light'); setThemeLabel(); })();
+
+function buildMultiSelect(sel,label,options,selected,onChange){
+  const el=$(sel); el.classList.add('ms'); const esc=s=>String(s).replace(/"/g,'&quot;');
+  el.innerHTML='<button class="ms-btn" type="button"></button><div class="ms-panel"><input class="ms-search" placeholder="Buscar..."><label class="ms-all"><input type="checkbox"> (Todos)</label><div class="ms-items"></div></div>';
+  const btn=el.querySelector('.ms-btn'),panel=el.querySelector('.ms-panel'),search=el.querySelector('.ms-search'),allCb=el.querySelector('.ms-all input'),items=el.querySelector('.ms-items');
+  function lt(){ if(selected.size>=options.length)return label+': Todos'; if(selected.size===0)return label+': Nenhum'; return label+': '+selected.size+'/'+options.length; }
+  function sync(){ btn.textContent=lt(); allCb.checked=selected.size>=options.length; }
+  items.innerHTML=options.map(o=>'<label data-v="'+esc(o)+'"><input type="checkbox" '+(selected.has(o)?'checked':'')+'> '+o+'</label>').join('');
+  sync();
+  items.querySelectorAll('label input').forEach((inp,i)=>{ inp.onchange=()=>{ const v=options[i]; inp.checked?selected.add(v):selected.delete(v); sync(); onChange(); }; });
+  allCb.onchange=()=>{ selected.clear(); if(allCb.checked)options.forEach(o=>selected.add(o)); items.querySelectorAll('label input').forEach(c=>c.checked=allCb.checked); sync(); onChange(); };
+  search.oninput=()=>{ const q=norm(search.value); items.querySelectorAll('label').forEach(l=>{ l.style.display=norm(l.dataset.v).includes(q)?'flex':'none'; }); };
+  btn.onclick=e=>{ e.stopPropagation(); const open=el.classList.contains('open'); document.querySelectorAll('.ms.open').forEach(x=>x.classList.remove('open')); if(!open){el.classList.add('open');search.focus();} };
+  panel.onclick=e=>e.stopPropagation();
+}
+document.addEventListener('click',()=>document.querySelectorAll('.ms.open').forEach(e=>e.classList.remove('open')));
+
+// ===== Parse de cada relatório =====
+function parseMatriculas(buf){
+  const {t,r}=sheets(buf);
+  const hi=Math.max(findHeader(t,'nome','modalidade'),0);
+  const head=t[hi];
+  const c={ cel:findCol(head,'celular'), tel:findCol(head,'telefone'), nome:findCol(head,'nome'),
+    op:findCol(head,'operador da matricula','operador'), mod:findCol(head,'modalidade'), uni:findCol(head,'unidade'),
+    curso:findCol(head,'curso'), cpf:findCol(head,'cpf'), valor:findCol(head,'valor pago matricula','valor pago'),
+    sMat:findCol(head,'status da matricula'), dPre:findCol(head,'data da pre matricula'),
+    dPag:findCol(head,'data pagamento'), dMat:findCol(head,'data da matricula') };
+  matRecords=[]; matPhoneRaw=new Map();
+  for(let i=hi+1;i<t.length;i++){ const T=t[i]; if(!T||!cell(T,c.nome))continue; const R=r[i]||[];
+    const raw=cellNum(R,T,c.cel)||cellNum(R,T,c.tel); const k=phoneKey(raw);
+    if(k&&!matPhoneRaw.has(k)) matPhoneRaw.set(k,raw);
+    matRecords.push({ phone:k, raw, nome:cell(T,c.nome), op:cleanName(cell(T,c.op))||'(sem operador)',
+      mod:cell(T,c.mod)||'(sem modalidade)', uni:cell(T,c.uni)||'(sem unidade)', curso:cell(T,c.curso)||'(sem curso)',
+      cpf:c.cpf>=0?cell(T,c.cpf).replace(/\D/g,''):'', valor:c.valor>=0?numOf(cellNum(R,T,c.valor)):0,
+      nsMat:norm(T[c.sMat]), dPre:parseDateBR(T[c.dPre]), dPag:parseDateBR(T[c.dPag]), dMat:parseDateBR(T[c.dMat]) });
+  }
+}
+function parseLigacoes(buf){
+  const {t,r}=sheets(buf); const hi=Math.max(findHeader(t,'numero','duracao'),findHeader(t,'numero','status'),0);
+  const head=t[hi]; const cNum=detectPhoneCol(t,r,hi,'numero','telefone','fone','contato'), cSt=findCol(head,'status'), cDur=findCol(head,'duracao','dura'), cAg=findCol(head,'agente','operador');
+  ligMap=new Map(); ligOpsRaw=new Set(); hasLigFile=true;
+  const dur=s=>{const p=String(s||'').split(':').map(Number);return p.length===3?(p[0]||0)*3600+(p[1]||0)*60+(p[2]||0):0;};
+  for(let i=hi+1;i<t.length;i++){ const T=t[i]; if(!T)continue; const R=r[i]||[]; const ag=cleanName(cell(T,cAg)); if(ag)ligOpsRaw.add(ag);
+    const k=phoneKey(cellNum(R,T,cNum)); if(!k)continue;
+    const e=ligMap.get(k)||{raw:cellNum(R,T,cNum),efet:false,status:false};
+    if(dur(T[cDur])>30)e.efet=true; if(norm(T[cSt])==='atendida')e.status=true; ligMap.set(k,e);
+  }
+}
+function parseAtendimentos(buf){
+  const {t,r}=sheets(buf); const hi=Math.max(findHeader(t,'protocolo','origem'),findHeader(t,'numero','origem'),0);
+  const head=t[hi]; const cNum=detectPhoneCol(t,r,hi,'numero contato','numero','contato','telefone','fone'), cProto=findCol(head,'protocolo'), cAt=findCol(head,'nome usuario','usuario');
+  atMap=new Map(); atOpsRaw=new Set(); hasAtFile=true;
+  for(let i=hi+1;i<t.length;i++){ const T=t[i]; if(!T||(cProto>=0&&!cell(T,cProto)))continue; const R=r[i]||[]; const a=cleanName(cell(T,cAt)); if(a)atOpsRaw.add(a);
+    const k=phoneKey(cellNum(R,T,cNum)); if(!k)continue;
+    if(!atMap.has(k))atMap.set(k,{raw:cellNum(R,T,cNum)});
+  }
+}
+
+function runCross(matBuf,ligBuf,atBuf){
+  matRecords=[]; matPhoneRaw=new Map(); ligMap=new Map(); atMap=new Map(); hasLigFile=false; hasAtFile=false;
+  if(matBuf) parseMatriculas(matBuf);
+  if(ligBuf) parseLigacoes(ligBuf);
+  if(atBuf) parseAtendimentos(atBuf);
+  if(!matRecords.length){ alert('Não encontrei matrículas/telefones na base. Verifique o arquivo de Matrículas.'); return; }
+  const uniq=k=>[...new Set(matRecords.map(x=>x[k]))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
+  const mods=uniq('mod'),unis=uniq('uni'),ops=uniq('op'),cursos=uniq('curso');
+  selMod=new Set(mods);selUni=new Set(unis);selOp=new Set(ops);selCurso=new Set(cursos);
+  buildMultiSelect('#fMod','Modalidade',mods,selMod,renderAll);
+  buildMultiSelect('#fUni','Unidade',unis,selUni,renderAll);
+  buildMultiSelect('#fOp','Operador',ops,selOp,renderAll);
+  buildMultiSelect('#fCurso','Curso',cursos,selCurso,renderAll);
+  computeBase();
+  $('#setup').style.display='none'; $('#dash').style.display='block'; $('#pdfBtn').style.display='inline-block'; $('#reloadBtn').style.display='inline-block';
+  renderAll();
+}
+
+function hasLig(k){ const e=ligMap.get(k); if(!e)return false; return crit==='qualquer'?true:crit==='atendida'?e.status:e.efet; }
+function leads(){ // 1 entrada por telefone distinto entre os registros filtrados
+  const seen=new Map();
+  for(const x of filteredRecords()){ if(!x.phone)continue;
+    if(!seen.has(x.phone)) seen.set(x.phone,{key:x.phone,nome:x.nome||'',op:x.op||'',fone:fmtPhone(x.raw),lig:hasLig(x.phone),at:atMap.has(x.phone)});
+  }
+  return [...seen.values()];
+}
+
+function renderAll(){ renderKPIs(); renderResumo(); renderOpTable(); renderOpCross(); renderNameDiag(); renderCross(); renderDiag(); renderHeader(); }
+
+function opMapFrom(rawIter){ const m=new Map(); for(const raw of rawIter){ if(!raw)continue; const k=nameKey(raw); if(!k)continue; if(!m.has(k))m.set(k,new Set()); m.get(k).add(String(raw).trim()); } return m; }
+function opSources(){
+  const matRaw=new Set(matRecords.map(x=>x.op).filter(o=>o&&o!=='(sem operador)'));
+  return { M:opMapFrom(matRaw), L:opMapFrom(ligOpsRaw), A:opMapFrom(atOpsRaw) };
+}
+function renderOpCross(){
+  const {M,L,A}=opSources();
+  const leadsBy=new Map();
+  for(const x of matRecords){ if(!x.phone)continue; const k=nameKey(x.op); if(!k)continue; if(!leadsBy.has(k))leadsBy.set(k,new Set()); leadsBy.get(k).add(x.phone); }
+  const keys=new Set([...M.keys(),...L.keys(),...A.keys()]);
+  let rows=[...keys].map(k=>{ const inM=M.has(k),inL=L.has(k),inA=A.has(k);
+    return {key:k,nome:[...(M.get(k)||L.get(k)||A.get(k))][0],mat:inM?1:0,lig:inL?1:0,at:inA?1:0,nfontes:(inM?1:0)+(inL?1:0)+(inA?1:0),leads:(leadsBy.get(k)||new Set()).size}; });
+  const k=opCrossSort.k,dir=opCrossSort.dir; rows.sort((a,b)=>typeof a[k]==='string'?a[k].localeCompare(b[k],'pt-BR')*dir:(a[k]-b[k])*dir);
+  const ck=x=>x?'<span class="yes">✓</span>':'<span class="no">–</span>';
+  $('#opCrossTable tbody').innerHTML=rows.map(r=>`<tr><td>${r.nome}</td><td class="c">${ck(r.mat)}</td><td class="c">${ck(r.lig)}</td><td class="c">${ck(r.at)}</td><td class="num">${r.nfontes}</td><td class="num">${int(r.leads)}</td></tr>`).join('')||'<tr><td colspan="6" class="sub">Sem operadores.</td></tr>';
+  const in2=rows.filter(r=>r.nfontes>=2).length, in3=rows.filter(r=>r.nfontes===3).length;
+  $('#opCrossInfo').textContent=`${int(rows.length)} operadores distintos · ${int(in2)} em 2+ relatórios · ${int(in3)} nos 3.`;
+}
+function renderNameDiag(){
+  const {M,L,A}=opSources();
+  const keys=new Set([...M.keys(),...L.keys(),...A.keys()]); const rows=[];
+  for(const k of keys){ const srcs=(M.has(k)?1:0)+(L.has(k)?1:0)+(A.has(k)?1:0); if(srcs<2)continue;
+    const all=new Set([...(M.get(k)||[]),...(L.get(k)||[]),...(A.get(k)||[])]); if(all.size<2)continue;
+    rows.push({k,m:[...(M.get(k)||[])].join(' / ')||'—',l:[...(L.get(k)||[])].join(' / ')||'—',a:[...(A.get(k)||[])].join(' / ')||'—'}); }
+  rows.sort((a,b)=>a.k.localeCompare(b.k,'pt-BR'));
+  $('#nameDiagTable tbody').innerHTML=rows.slice(0,300).map(r=>`<tr><td>${r.k}</td><td>${r.m}</td><td>${r.l}</td><td>${r.a}</td></tr>`).join('')||'<tr><td colspan="4" class="sub">Nenhuma variação de escrita detectada entre relatórios com o critério atual.</td></tr>';
+  $('#nameDiagInfo').textContent=`${int(rows.length)} operadores aparecem em mais de um relatório com grafia diferente. Ajuste "Casar nomes por" para afinar.`;
+}
+
+function renderHeader(){
+  const L=leads(), n=L.length;
+  const total=new Set(BASE.map(x=>x.phone).filter(Boolean)).size;
+  $('#periodo').textContent=`${int(n)} leads de matrícula (telefones distintos) cruzados`;
+  $('#filterInfo').textContent = n<total ? `(filtrado: ${int(n)} de ${int(total)})` : '';
+  const emit=new Date().toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  const critTxt={efetiva:'conversa real (>30s)',atendida:'qualquer Atendida',qualquer:'qualquer ligação'}[crit];
+  const lbl=(set,allN)=> set.size<allN? set.size+' selec.':'Todos';
+  const u=k=>[...new Set(matRecords.map(x=>x[k]))].length;
+  const per=(dateStart||dateEnd)?` · Período (${ {dMat:'Data Matrícula',dPre:'Pré-matrícula',dPag:'Pagamento'}[dateBasis] }): ${dateStart?dateStart.toLocaleDateString('pt-BR'):'início'} a ${dateEnd?dateEnd.toLocaleDateString('pt-BR'):'fim'}`:'';
+  $('#printinfo').innerHTML=`<b>${int(n)} leads de matrícula (telefones distintos)</b>${per}<br>Modalidade: ${lbl(selMod,u('mod'))} · Unidade: ${lbl(selUni,u('uni'))} · Operador: ${lbl(selOp,u('op'))} · Curso: ${lbl(selCurso,u('curso'))}${dedupCpf?' · 1 matr./CPF':''} · Ligação atendida: ${critTxt}${hasLigFile?'':' · (sem ligações)'}${hasAtFile?'':' · (sem atendimentos)'} · Emitido em ${emit}`;
+}
+
+function renderKPIs(){
+  const L=leads(), n=L.length||1, N=L.length;
+  const cl=L.filter(x=>x.lig).length, ca=L.filter(x=>x.at).length, cb=L.filter(x=>x.lig&&x.at).length;
+  const algum=L.filter(x=>x.lig||x.at).length, sem=N-algum;
+  const pct=v=>(v/n*100).toFixed(1)+'%';
+  const cards=[
+    {label:'Leads (telefones)',val:int(N),foot:'matrículas distintas',cls:'accent'},
+    {label:'Com ligação atendida',val:int(cl),foot:pct(cl),cls:'good'},
+    {label:'Com atendimento wpp',val:int(ca),foot:pct(ca),cls:'good'},
+    {label:'Com AMBOS',val:int(cb),foot:pct(cb)+' · ligação + wpp',cls:'qualif'},
+    {label:'Com algum contato',val:int(algum),foot:pct(algum),cls:'accent'},
+    {label:'Sem nenhum contato',val:int(sem),foot:pct(sem),cls:'bad'},
+  ];
+  $('#kpis').innerHTML=cards.map(c=>`<div class="card kpi ${c.cls}"><div class="label">${c.label}</div><div class="val">${c.val}</div><div class="foot">${c.foot}</div></div>`).join('');
+}
+
+function renderResumo(){
+  const L=leads(), n=L.length||1;
+  const onlyLig=L.filter(x=>x.lig&&!x.at).length, onlyAt=L.filter(x=>x.at&&!x.lig).length, both=L.filter(x=>x.lig&&x.at).length, none=L.filter(x=>!x.lig&&!x.at).length;
+  const row=(lbl,v,col)=>`<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px"><span>${lbl}</span><span style="color:var(--muted)">${int(v)} · ${(v/n*100).toFixed(1)}%</span></div><div class="bar-wrap" style="height:10px"><div class="bar" style="width:${v/n*100}%;background:${col}"></div></div></div>`;
+  $('#resumo').innerHTML =
+    row('✅ Em todos: matrícula + ligação atendida + atendimento wpp', both, 'var(--qualif)')+
+    row('📞 Matrícula + só ligação atendida', onlyLig, 'var(--good)')+
+    row('💬 Matrícula + só atendimento wpp', onlyAt, 'var(--good)')+
+    row('⚠️ Matrícula sem ligação atendida nem atendimento', none, 'var(--bad)')+
+    `<div class="sub" style="margin-top:8px">Base: ${int(L.length)} leads de matrícula.${hasLigFile?'':' <b style="color:var(--warn)">Arquivo de ligações não carregado.</b>'}${hasAtFile?'':' <b style="color:var(--warn)">Arquivo de atendimentos não carregado.</b>'}</div>`;
+}
+
+function renderOpTable(){
+  const L=leads(), m={};
+  for(const x of L){ const a=m[x.op]||(m[x.op]={nome:x.op,leads:0,lig:0,at:0,ambos:0}); a.leads++; if(x.lig)a.lig++; if(x.at)a.at++; if(x.lig&&x.at)a.ambos++; if(x.lig||x.at)a.algum=(a.algum||0)+1; }
+  let rows=Object.values(m).map(a=>({...a,cobertura:a.leads?(a.algum||0)/a.leads*100:0}));
+  const k=opSort.k,dir=opSort.dir; rows.sort((a,b)=>typeof a[k]==='string'?a[k].localeCompare(b[k],'pt-BR')*dir:(a[k]-b[k])*dir);
+  const maxL=Math.max(...rows.map(r=>r.leads),1);
+  $('#opTable tbody').innerHTML=rows.map(r=>`<tr>
+    <td>${r.nome}</td>
+    <td class="num"><div style="display:flex;align-items:center;gap:8px;justify-content:flex-end"><span>${int(r.leads)}</span><div class="bar-wrap" style="width:46px"><div class="bar" style="width:${r.leads/maxL*100}%;background:var(--accent)"></div></div></div></td>
+    <td class="num" style="color:var(--good)">${int(r.lig)}</td>
+    <td class="num" style="color:var(--good)">${int(r.at)}</td>
+    <td class="num" style="color:var(--qualif);font-weight:700">${int(r.ambos)}</td>
+    <td class="num">${r.cobertura.toFixed(1)}%</td>
+  </tr>`).join('')||'<tr><td colspan="6" class="sub">Sem dados.</td></tr>';
+}
+
+function renderCross(){
+  let L=leads();
+  if(showF==='match')L=L.filter(x=>x.lig||x.at);
+  else if(showF==='ambos')L=L.filter(x=>x.lig&&x.at);
+  else if(showF==='sem')L=L.filter(x=>!x.lig&&!x.at);
+  const k=crossSort.k,dir=crossSort.dir;
+  const val=(x)=> k==='lig'?(x.lig?1:0): k==='at'?(x.at?1:0): String(x[k]||'');
+  L.sort((a,b)=>{const va=val(a),vb=val(b); return typeof va==='string'?va.localeCompare(vb,'pt-BR')*dir:(va-vb)*dir;});
+  const LIM=1000, shown=L.slice(0,LIM);
+  $('#crossTable tbody').innerHTML=shown.map(x=>`<tr>
+    <td>${x.fone}</td><td>${x.nome}</td><td>${x.op}</td>
+    <td class="c">${x.lig?'<span class="yes">✓</span>':'<span class="no">–</span>'}</td>
+    <td class="c">${x.at?'<span class="yes">✓</span>':'<span class="no">–</span>'}</td>
+  </tr>`).join('')||'<tr><td colspan="5" class="sub">Nenhum lead no filtro.</td></tr>';
+  $('#crossInfo').textContent = `${int(L.length)} leads no filtro`+(L.length>LIM?` (mostrando os primeiros ${LIM})`:'');
+}
+
+function renderDiag(){
+  // telefones que casaram em >=2 relatórios com formatos brutos diferentes
+  const rows=[];
+  for(const [k,raw] of matPhoneRaw){ const l=ligMap.get(k), a=atMap.get(k); if(!l&&!a)continue;
+    const forms=[raw, l?l.raw:null, a?a.raw:null].filter(Boolean);
+    const distintos=new Set(forms.map(f=>String(f))).size>1;
+    if(distintos) rows.push({k, m:raw, l:l?l.raw:'—', a:a?a.raw:'—'});
+  }
+  const LIM=300, shown=rows.slice(0,LIM);
+  $('#diagTable tbody').innerHTML=shown.map(r=>`<tr><td>${r.k}</td><td>${r.m||'—'}</td><td>${r.l}</td><td>${r.a}</td></tr>`).join('')||'<tr><td colspan="4" class="sub">Nenhum número casou entre relatórios (verifique se os arquivos de ligações/atendimentos foram carregados).</td></tr>';
+  $('#diagInfo').textContent=`${int(rows.length)} números encontrados em mais de um relatório com formato diferente`+(rows.length>LIM?` (mostrando ${LIM})`:'')+'. Mesma chave = mesmo número.';
+}
+
+// ===== Controles =====
+$('#critLig').onchange=e=>{ crit=e.target.value; renderAll(); };
+$('#showFilter').onchange=e=>{ showF=e.target.value; renderCross(); };
+$('#nameMatch').onchange=e=>{ nameMatch=e.target.value; renderOpCross(); renderNameDiag(); };
+document.querySelectorAll('#opCrossTable th').forEach(th=>th.addEventListener('click',()=>{const k=th.dataset.k;if(!k)return;if(opCrossSort.k===k)opCrossSort.dir*=-1;else{opCrossSort.k=k;opCrossSort.dir=k==='nome'?1:-1;}renderOpCross();}));
+$('#dedupCpf').onchange=e=>{ dedupCpf=e.target.checked; computeBase(); renderAll(); };
+$('#dateBasis').onchange=e=>{ dateBasis=e.target.value; if(dateStart||dateEnd) renderAll(); };
+$('#dStart').onchange=e=>{ dateStart=parseInputDate(e.target.value); renderAll(); };
+$('#dEnd').onchange=e=>{ dateEnd=parseInputDate(e.target.value); renderAll(); };
+$('#clearDates').onclick=()=>{ dateStart=dateEnd=null; $('#dStart').value=''; $('#dEnd').value=''; renderAll(); };
+document.querySelectorAll('#opTable th').forEach(th=>th.addEventListener('click',()=>{const k=th.dataset.k;if(!k)return;if(opSort.k===k)opSort.dir*=-1;else{opSort.k=k;opSort.dir=k==='nome'?1:-1;}renderOpTable();}));
+document.querySelectorAll('#crossTable th').forEach(th=>th.addEventListener('click',()=>{const k=th.dataset.k;if(!k)return;if(crossSort.k===k)crossSort.dir*=-1;else{crossSort.k=k;crossSort.dir=(k==='lig'||k==='at')?-1:1;}renderCross();}));
+function exportPDF(){ document.querySelectorAll('.ms.open').forEach(e=>e.classList.remove('open')); window.print(); }
+
+// ===== Upload (standalone) =====
+let bMat=null,bLig=null,bAt=null;
+function zone(zId,iId,nId,set){ const z=$(zId),i=$(iId);
+  function acc(f){ $(nId).textContent='✓ '+f.name; z.classList.add('ok'); const fr=new FileReader(); fr.onload=e=>{ set(e.target.result); refresh(); }; fr.readAsArrayBuffer(f); }
+  z.onclick=()=>i.click(); i.onchange=e=>{const f=e.target.files[0];if(f)acc(f);};
+  ['dragover','dragenter'].forEach(ev=>z.addEventListener(ev,e=>{e.preventDefault();z.classList.add('over');}));
+  ['dragleave','drop'].forEach(ev=>z.addEventListener(ev,e=>{e.preventDefault();z.classList.remove('over');}));
+  z.addEventListener('drop',e=>{const f=e.dataTransfer.files[0];if(f)acc(f);});
+}
+function refresh(){ $('#crossBtn').disabled = !(bMat && (bLig||bAt)); }
+zone('#uzMat','#inpMat','#fMatName',b=>bMat=b);
+zone('#uzLig','#inpLig','#fLigName',b=>bLig=b);
+zone('#uzAt','#inpAt','#fAtName',b=>bAt=b);
+$('#crossBtn').onclick=()=>runCross(bMat,bLig,bAt);
+
+// ===== Integração com o Painel de Gestão =====
+window.addEventListener('message',function(ev){ var d=ev.data||{}; if(d&&d.kind==='loadCross'){ try{ runCross(d.mat,d.lig,d.at); }catch(err){ alert('Erro no cruzamento: '+err.message); }
+  if(d.canChange===false){ var rb=document.getElementById('reloadBtn'); if(rb)rb.style.display='none'; } } });
+</script>
+</body>
+</html>

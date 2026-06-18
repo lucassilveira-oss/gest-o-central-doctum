@@ -83,12 +83,12 @@
 
 <div id="wrap" style="display:none">
   <div id="status">Faça login para começar.</div>
-  <iframe id="frameLig" data-src="dashboard-standalone.html"></iframe>
-  <iframe id="frameMat" data-src="dashboard-matriculas-standalone.html"></iframe>
-  <iframe id="frameAt" data-src="dashboard-atendimentos-standalone.html"></iframe>
-  <iframe id="frameCross" data-src="dashboard-cruzamento-standalone.html"></iframe>
-  <iframe id="frameComp" data-src="dashboard-comparativo-standalone.html"></iframe>
-  <iframe id="frameTV" data-src="painel-tv-standalone.html" allowfullscreen allow="fullscreen"></iframe>
+  <iframe id="frameLig" data-src="dashboard.html"></iframe>
+  <iframe id="frameMat" data-src="dashboard-matriculas.html"></iframe>
+  <iframe id="frameAt" data-src="dashboard-atendimentos.html"></iframe>
+  <iframe id="frameCross" data-src="dashboard-cruzamento.html"></iframe>
+  <iframe id="frameComp" data-src="dashboard-comparativo.html"></iframe>
+  <iframe id="frameTV" data-src="painel-tv.html" allowfullscreen allow="fullscreen"></iframe>
 </div>
 
 <!-- MODAL UPLOAD (admin) -->
@@ -134,8 +134,11 @@ function enterApp(user){
   $('#wrap').style.display='block';
   $('#who').textContent = user.email + (isAdmin?' (admin)':' (líder)');
   $('#uploadBtn').style.display = isAdmin ? 'inline-block' : 'none';
+  prewarmLib();          // baixa a biblioteca 1x e guarda em cache (deixa a 1ª aba rápida)
   loadReports();
 }
+// pré-aquece a lib compartilhada: as abas só apontam p/ ela, então o navegador baixa uma vez e reaproveita
+function prewarmLib(){ try{ if(window._libWarmed)return; window._libWarmed=1; const l=document.createElement('link'); l.rel='preload'; l.as='script'; l.href='xlsx.full.min.js'; document.head.appendChild(l); }catch(e){} }
 
 // ---- STORAGE ----
 async function dl(name){ try{ const {data,error}=await sb.storage.from(C.BUCKET).download(name); if(error||!data)return null; return await data.arrayBuffer(); }catch(e){ return null; } }
@@ -151,7 +154,7 @@ async function loadReports(){
   $('#tabComp').disabled=!(comp&&mat);
   pushAll();
   const first = lig?'lig':mat?'mat':at?'at':null;
-  if(first){ $('#status').style.display='none'; show(first); }
+  if(first){ $('#status').style.display='none'; show(first); schedulePreload(first); }
   else $('#status').textContent='Nenhum relatório no servidor ainda.'+(isAdmin?' Clique em "Atualizar relatórios" para enviar.':' Peça ao admin para enviar.');
 }
 
@@ -187,6 +190,13 @@ function pushAll(){ KEYS.forEach(pushTo); }
 KEYS.forEach(t=>{ frame(t).addEventListener('load',()=>{ loaded[t]=true; pushTo(t); }); });
 // carrega o dashboard só quando a aba é aberta (economiza memória — essencial no celular)
 function ensureLoaded(t){ const f=frame(t); if(f && !f.getAttribute('src')){ f.setAttribute('src', f.getAttribute('data-src')); } }
+// no desktop, carrega as demais abas em segundo plano (escalonado) p/ abrir instantâneo no clique.
+// no celular mantém sob demanda, pra não estourar memória (problema antigo do iPhone).
+function schedulePreload(active){
+  try{ if(!window.matchMedia('(min-width:900px) and (pointer:fine)').matches) return; }catch(e){ return; }
+  KEYS.filter(t=>t!==active && !$('#'+TBID[t]).disabled)
+      .forEach((t,i)=> setTimeout(()=>ensureLoaded(t), 1200*(i+1)));
+}
 
 // ---- TABS ----
 function show(t){ ensureLoaded(t); KEYS.forEach(x=>{ $('#'+FRID[x]).classList.toggle('on',x===t); $('#'+TBID[x]).classList.toggle('on',x===t); }); }
