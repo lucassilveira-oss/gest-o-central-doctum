@@ -100,8 +100,8 @@
     </div>
     <span style="font-size:13px;color:var(--muted);font-weight:600;margin-left:8px">Comparação</span>
     <div class="toggle" id="alignToggle">
-      <button data-a="mesma" class="on">Até a data (mesmo período)</button>
-      <button data-a="total">Total do período</button>
+      <button data-a="mesma">Até a data (mesmo período)</button>
+      <button data-a="total" class="on">Total do período</button>
     </div>
     <span style="font-size:13px;color:var(--muted);margin-left:8px">até</span>
     <input type="date" id="asof" class="dateinput" title="Data de corte (padrão: hoje)">
@@ -150,16 +150,16 @@ function statusGroup(ns){ if(ns.includes('tranc'))return 'mat'; if(ns.includes('
 
 let PREV=[], CUR=[], yPrev=null, yCur=null;
 let selMod=new Set(), selUni=new Set(), selCurso=new Set();
-let align='mesma', asof=null, dim='uni', dimSort={k:'vc',dir:-1};
-const TODAY=eod(new Date());
+let align='total', asof=null, dim='uni', dimSort={k:'vc',dir:-1};
 const METRIC_ORDER=['mat','pre'];                   // grupos por STATUS
 const STATUS_NAMES={mat:'Matriculados',pre:'Pré-matriculados'};
 let metrics=new Set(['mat','pre']);                 // padrão: ambos = todos os status
 const selMetricsArr=()=>METRIC_ORDER.filter(m=>metrics.has(m));
 const metricLabel=()=> metrics.size>=METRIC_ORDER.length ? 'Todos os status' : selMetricsArr().map(m=>STATUS_NAMES[m]).join(' + ');
-// conta por STATUS, ancorado na Data da Pré-matrícula (todo registro tem).
-// 1 registro = 1 contagem (grupos não se sobrepõem). Datas futuras (>hoje) = erro -> ignoradas.
-function recContrib(r,end){ if(!metrics.has(r.sg))return 0; const d=r.dPre; if(!d||d>TODAY)return 0; if(end&&d>end)return 0; return 1; }
+// conta por STATUS (Matriculados = Matriculado+Trancado; Pré = Pré). 1 registro = 1 contagem.
+// modo "total" (end=null): conta tudo do ciclo, qualquer data -> bate com a aba Matrículas.
+// modo "até a data" (end definido): corta por Data da Pré <= corte.
+function recContrib(r,end){ if(!metrics.has(r.sg))return 0; if(end){ const d=r.dPre; if(!d||d>end)return 0; } return 1; }
 
 function setThemeLabel(){ $('#themeBtn').textContent=document.body.classList.contains('light')?'🌙 Modo escuro':'☀️ Modo claro'; }
 function toggleTheme(){ document.body.classList.toggle('light'); try{localStorage.setItem('dash_theme',document.body.classList.contains('light')?'light':'dark');}catch(e){} setThemeLabel(); if(CUR.length||PREV.length)renderAll(); }
@@ -193,11 +193,20 @@ function parseRep(buf){
       dPre:parseBR(r[c.dPre]),dMat:parseBR(r[c.dMat]),dTranc:parseBR(r[c.dTranc])}); }
   return recs;
 }
-function domYear(recs){ const c={}; for(const r of recs){ const d=r.dPre||r.dMat; if(d)c[d.getFullYear()]=(c[d.getFullYear()]||0)+1; } let best=null,mx=-1; for(const y in c)if(c[y]>mx){mx=c[y];best=+y;} return best; }
+// ano do CICLO = primeiro ano relevante das datas de pré (NÃO o mais frequente:
+// o relatório traz intakes futuros 2027/2028, que não devem definir o rótulo do ano).
+function cycleYear(recs){
+  const c={}; let tot=0;
+  for(const r of recs){ const d=r.dPre||r.dMat; if(d){ const y=d.getFullYear(); c[y]=(c[y]||0)+1; tot++; } }
+  const years=Object.keys(c).map(Number).sort((a,b)=>a-b); if(!years.length) return null;
+  const thr=Math.max(8, tot*0.12);
+  for(const y of years){ if(c[y]>=thr) return y; }
+  let best=years[0],mx=-1; for(const y of years) if(c[y]>mx){mx=c[y];best=y;} return best;
+}
 
 function runCompare(prevBuf,curBuf){
   PREV = prevBuf?parseRep(prevBuf):[]; CUR = curBuf?parseRep(curBuf):[];
-  yCur = domYear(CUR) || (new Date()).getFullYear(); yPrev = domYear(PREV) || (yCur-1);
+  yCur = cycleYear(CUR) || (new Date()).getFullYear(); yPrev = yCur-1;
   const uniq=k=>[...new Set([...PREV,...CUR].map(x=>x[k]))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
   const mods=uniq('mod'), unis=uniq('uni'), cursos=uniq('curso');
   selMod=new Set(mods); selUni=new Set(unis); selCurso=new Set(cursos);

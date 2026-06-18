@@ -280,6 +280,7 @@ function bucket(d,g){
 }
 const real = n => (n||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
 const int = n => (n||0).toLocaleString('pt-BR');
+const MES=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
 
 // ====== Estado ======
 let ALL=[];
@@ -454,10 +455,10 @@ function drawChart(elId,key,totId,color){
   $(totId).textContent = `— ${int(total)} com data preenchida`;
   const max=Math.max(...keys.map(k=>b[k]),1);
   $(elId).innerHTML = keys.length? keys.map(k=>{
-    const lbl = gran==='M'? k.slice(5,7)+'/'+k.slice(2,4)
-      : (gran==='D'||gran==='W')? k.slice(8,10)+'/'+k.slice(5,7)
-      : k;
-    const tip = gran==='W'? `Semana de ${k.slice(8,10)}/${k.slice(5,7)}: ${b[k]}` : `${k}: ${b[k]}`;
+    const lbl = gran==='Y'? k
+      : gran==='M'? MES[(+k.slice(5,7))-1]+'/'+k.slice(2,4)
+      : k.slice(8,10)+'/'+k.slice(5,7)+'/'+k.slice(2,4);
+    const tip = gran==='W'? `Semana de ${k.slice(8,10)}/${k.slice(5,7)}/${k.slice(2,4)}: ${b[k]}` : `${lbl}: ${b[k]}`;
     return `<div class="ccol" title="${tip}"><div class="ccount">${b[k]}</div><div class="cbar" style="height:${b[k]/max*100}%;background:${color}"></div><div class="clbl">${lbl}</div></div>`;
   }).join('') : '<div class="sub">Sem datas preenchidas neste recorte.</div>';
 }
