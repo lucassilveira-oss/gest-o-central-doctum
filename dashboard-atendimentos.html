@@ -306,7 +306,7 @@ function renderAll(){ renderHeader(); renderKPIs(); renderEval(); renderChart();
 function renderHeader(){
   const d=fData(), dts=d.map(x=>x.dt).filter(Boolean);
   let txt=`${int(d.length)} atendimentos`;
-  if(dts.length){ const mn=new Date(Math.min(...dts)),mx=new Date(Math.max(...dts)); txt=`Atendimentos de ${mn.toLocaleDateString('pt-BR')} a ${mx.toLocaleDateString('pt-BR')} · ${int(d.length)} encerrados`; }
+  if(dts.length){ let a=dts[0],b=dts[0]; for(const t of dts){ if(t<a)a=t; if(t>b)b=t; } const mn=new Date(a),mx=new Date(b); txt=`Atendimentos de ${mn.toLocaleDateString('pt-BR')} a ${mx.toLocaleDateString('pt-BR')} · ${int(d.length)} encerrados`; }
   $('#periodo').textContent=txt;
   $('#filterInfo').textContent = d.length<ALL.length ? `(filtrado: ${int(d.length)} de ${int(ALL.length)})` : '';
   document.title='Dashboard de Atendimentos';

@@ -404,7 +404,7 @@ function renderHeader(){
   const d=fData();
   const dts=d.map(x=>x.dMat).filter(Boolean);
   let txt=`${int(d.length)} matrículas`;
-  if(dts.length){ const min=new Date(Math.min(...dts)),max=new Date(Math.max(...dts));
+  if(dts.length){ let a=dts[0],b=dts[0]; for(const t of dts){ if(t<a)a=t; if(t>b)b=t; } const min=new Date(a),max=new Date(b);
     const f=x=>x.toLocaleDateString('pt-BR'); txt=`Matrículas de ${f(min)} a ${f(max)} · ${int(d.length)} registros`; }
   $('#periodo').textContent=txt;
   $('#filterInfo').textContent = d.length<BASE.length ? `(filtrado: ${int(d.length)} de ${int(BASE.length)})` : '';
