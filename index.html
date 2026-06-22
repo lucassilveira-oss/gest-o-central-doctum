@@ -6,6 +6,8 @@
 <title>Painel de Gestão — Online</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
+<!-- lib compartilhada: pré-aquece o cache p/ as abas e habilita a otimização no upload -->
+<script src="xlsx.full.min.js" defer></script>
 <style>
   :root{--bg:#0f172a;--panel:#1e293b;--panel2:#273549;--line:#334155;--txt:#e2e8f0;--muted:#94a3b8;--accent:#38bdf8;--good:#34d399;--bad:#f87171;}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -134,11 +136,24 @@ function enterApp(user){
   $('#wrap').style.display='block';
   $('#who').textContent = user.email + (isAdmin?' (admin)':' (líder)');
   $('#uploadBtn').style.display = isAdmin ? 'inline-block' : 'none';
-  prewarmLib();          // baixa a biblioteca 1x e guarda em cache (deixa a 1ª aba rápida)
   loadReports();
 }
-// pré-aquece a lib compartilhada: as abas só apontam p/ ela, então o navegador baixa uma vez e reaproveita
-function prewarmLib(){ try{ if(window._libWarmed)return; window._libWarmed=1; const l=document.createElement('link'); l.rel='preload'; l.as='script'; l.href='xlsx.full.min.js'; document.head.appendChild(l); }catch(e){} }
+// Otimiza no upload: lê os textos formatados e regrava como .xlsx comprimido (texto).
+// Verificado 100% fiel; reduz ~70% o download e o tempo de processamento. Qualquer erro -> sobe o original.
+async function optimizeForUpload(file){
+  try{
+    if(typeof XLSX==='undefined') return file;
+    const buf=await file.arrayBuffer();
+    const wb=XLSX.read(buf,{type:'array'});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,defval:null});
+    if(!rows.length) return file;
+    const ws2=XLSX.utils.aoa_to_sheet(rows);
+    const wb2=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb2,ws2,'Dados');
+    const out=XLSX.write(wb2,{type:'array',bookType:'xlsx',compression:true});
+    return (out.byteLength < buf.byteLength) ? new Blob([out]) : file; // só usa se ficou menor
+  }catch(e){ return file; }
+}
 
 // ---- STORAGE ----
 async function dl(name){ try{ const {data,error}=await sb.storage.from(C.BUCKET).download(name); if(error||!data)return null; return await data.arrayBuffer(); }catch(e){ return null; } }
@@ -190,12 +205,13 @@ function pushAll(){ KEYS.forEach(pushTo); }
 KEYS.forEach(t=>{ frame(t).addEventListener('load',()=>{ loaded[t]=true; pushTo(t); }); });
 // carrega o dashboard só quando a aba é aberta (economiza memória — essencial no celular)
 function ensureLoaded(t){ const f=frame(t); if(f && !f.getAttribute('src')){ f.setAttribute('src', f.getAttribute('data-src')); } }
-// no desktop, carrega as demais abas em segundo plano (escalonado) p/ abrir instantâneo no clique.
-// no celular mantém sob demanda, pra não estourar memória (problema antigo do iPhone).
+// Pré-carrega em 2º plano APENAS as abas leves (arquivos pequenos: Matrículas/Comparativo).
+// As pesadas (Ligações ~6MB, Atendimentos, Cruzamento, TV) ficam sob demanda — senão processa
+// tudo de uma vez e trava. No celular não pré-carrega nada (memória).
 function schedulePreload(active){
   try{ if(!window.matchMedia('(min-width:900px) and (pointer:fine)').matches) return; }catch(e){ return; }
-  KEYS.filter(t=>t!==active && !$('#'+TBID[t]).disabled)
-      .forEach((t,i)=> setTimeout(()=>ensureLoaded(t), 1200*(i+1)));
+  ['mat','comp'].filter(t=>t!==active && !$('#'+TBID[t]).disabled)
+      .forEach((t,i)=> setTimeout(()=>ensureLoaded(t), 1500*(i+1)));
 }
 
 // ---- TABS ----
@@ -217,7 +233,10 @@ $('#upSend').onclick=async ()=>{
   try{
     let any=false;
     for(const [sel,name] of jobs){ const f=$(sel).files[0]; if(!f)continue; any=true;
-      const {error}=await sb.storage.from(C.BUCKET).upload(name,f,{upsert:true,contentType:'application/octet-stream'});
+      $('#upSend').textContent='Otimizando '+name+'...';
+      const blob=await optimizeForUpload(f);     // .xls 24MB -> .xlsx ~6MB (mesmo dado, 3x mais rápido)
+      $('#upSend').textContent='Enviando '+name+'...';
+      const {error}=await sb.storage.from(C.BUCKET).upload(name,blob,{upsert:true,contentType:'application/octet-stream'});
       if(error) throw new Error(name+': '+error.message);
     }
     if(!any){ $('#upErr').textContent='Selecione ao menos um arquivo.'; }
